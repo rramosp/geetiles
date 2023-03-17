@@ -16,7 +16,7 @@ install with
 
     geed grid --aoi_wkt_file luxembourg.wkt  --chip_size_meters 1000 --aoi_name lux --dest_dir .
 
-you can find the file `luxembourg.wkt` under `data`.
+you can find the file `luxembourg.wkt` under `data`. Usually you would have to provide your own with your area of interest, with coordinates expressed in WSG84 degrees lon/lat.
 
 this generates file `./lux_partitions_aschips_14c55eb7d417f.geojson`. Use a tool such as [QGIS](https://qgis.org/) to view it.
 
