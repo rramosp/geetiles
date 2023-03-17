@@ -1,6 +1,6 @@
 from setuptools import setup
 
-setup(name='geedatasets',
+setup(name='geetiles',
       install_requires=['matplotlib','numpy', 'pandas','joblib',
                         'progressbar2', 'psutil', 'scipy', 'shapely',
                         'geopandas', 'pyproj', 'rasterio'
@@ -10,9 +10,9 @@ setup(name='geedatasets',
       scripts=[],
       entry_points={
             "console_scripts": [
-                  "geed = geedatasets.main:main",
+                  "geet = geetiles.main:main",
             ],      
       },
-      packages=['geedatasets'],
+      packages=['geetiles'],
       include_package_data=True,
       zip_safe=False)
