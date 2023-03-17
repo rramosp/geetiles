@@ -30,11 +30,11 @@ this generates file `./lux_partitions_aschips_14c55eb7d417f.geojson`. Use a tool
 
 this fills the folder `lux_partitions_aschips_14c55eb7d417f/s2` with RGB geotiff images of size 100x100 pixels.
 
-If using `sentinel2-rgb-median-2020`, which is an alias to [Sentinel-2 MSI Level 2-A](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR) GEE dataset, taking the median of the cloudless chips over the year 2020.
+If using `sentinel2-rgb-median-2020` as `gee_image_pycode`, which is an alias to [Sentinel-2 MSI Level 2-A](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR) GEE dataset, taking the median of the cloudless chips over the year 2020.
 
 <center><img src='imgs/sentinel2.png' width=800></center>
 
-If using `esa-world-cover`, which is an alias to [ESA WorldCover 10m v100](https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100) GEE dataset.
+If using `esa-world-cover` as `gee_image_pycode`, which is an alias to [ESA WorldCover 10m v100](https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100) GEE dataset.
 
 <center><img src='imgs/landcover.png' width=800></center>
 
