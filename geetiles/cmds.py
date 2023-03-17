@@ -118,6 +118,9 @@ n_processes        {n_processes}
             print ("--------------------------------------")
             raise e
         
+    else:
+        raise ValueError(f"file {gee_image_pycode} not found")
+        
     # download the tiles
     p = partitions.PartitionSet.from_file(tiles_file)
 
