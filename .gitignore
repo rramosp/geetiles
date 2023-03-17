@@ -1,0 +1,10 @@
+test.py
+*.pyc
+.vscode/settings.json
+.DS_Store
+.ipynb_checkpoints
+__pycache__
+build
+dist
+*egg-info
+.eggs
