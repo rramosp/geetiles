@@ -1,6 +1,7 @@
 
 import itertools
 import ee
+import os
 from shapely import wkt
 import geopandas as gpd
 import numpy as np
@@ -16,7 +17,7 @@ epsg4326 = utils.epsg4326
 
 
 def download(tiles_file, 
-             gee_image_codestr, 
+             gee_image_pycode, 
              dataset_name, 
              pixels_lonlat, meters_per_pixel, 
              max_downloads,
@@ -45,7 +46,7 @@ def download(tiles_file,
 using the following download specficication
 
 tiles_file:        {tiles_file}
-gee_image_codestr  {gee_image_codestr}
+gee_image_pycode   {gee_image_pycode}
 dataset_name       {dataset_name}
 pixels_lonlat      {pixels_lonlat}
 meters_per_pixel   {meters_per_pixel}
@@ -86,7 +87,7 @@ ee_auth_mode       {ee_auth_mode}
     ee.Initialize()
 
     # define gee image object
-    if gee_image_codestr == 'sentinel2-rgb-median-2020':
+    if gee_image_pycode == 'sentinel2-rgb-median-2020':
         def maskS2clouds(image):
             qa = image.select('MSK_CLDPRB')
             mask = qa.lt(5)
@@ -99,28 +100,29 @@ ee_auth_mode       {ee_auth_mode}
                         .median()\
                         .visualize(min=0, max=4000)
         
-    elif gee_image_codestr == 'esa-world-cover':
+    elif gee_image_pycode == 'esa-world-cover':
         gee_image = ee.ImageCollection("ESA/WorldCover/v100").first()
         
-    else:
-        all_statements_but_last, last_statement = utils.split_python_code(gee_image_codestr)
+    elif os.path.isfile(gee_image_pycode):
+        print (f"evaluating python code at {gee_image_pycode}")
+        pyfname = gee_image_pycode
+        gee_image_pycode = open(pyfname).read()
         try:
-            exec(all_statements_but_last)
-            gee_image = eval(last_statement)
+            exec(gee_image_pycode, globals())
+            gee_image = get_ee_image()
         except Exception as e:
             print ("--------------------------------------")
-            print ("error executing your gee_image_codestr")
+            print (f"error executing your code at {pyfname}")
             print ("--------------------------------------")
             raise e
         
-
     # download the tiles
     p = partitions.PartitionSet.from_file(tiles_file)
 
     # save gee_image_codestr
     dest_dir = p.get_downloaded_tiles_dest_dir(dataset_name)
-    with open(f"{dest_dir}.gee_imge_codestr.py", "w") as f:
-        f.write(gee_image_codestr)
+    with open(f"{dest_dir}.gee_image_pycode.py", "w") as f:
+        f.write(gee_image_pycode)
 
     p.download_gee_tiles(gee_image, dataset_name, 
                          meters_per_pixel = meters_per_pixel, 

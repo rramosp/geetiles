@@ -27,10 +27,10 @@ def main():
 
     dwn_parser = subparsers.add_parser('download', help='downloads tiles from gee.')
     dwn_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
-    dwn_parser.add_argument('--gee_image_codestr', required=True, type=str, help="python code, must eval to a ee.Image object. Can also be 'sentinel2-rgb-median-2020' or 'esa-world-cover' for built-in definitions")
+    dwn_parser.add_argument('--gee_image_pycode', required=True, type=str, help="A file with python code defining a function named get_ee_image that returns a gee Image object. Can also be the string 'sentinel2-rgb-median-2020' or 'esa-world-cover' for built-in definitions")
     dwn_parser.add_argument('--dataset_name', required=True, type=str, help='name for the folder to store downloads alongside tiles_file.')
     dwn_parser.add_argument('--pixels_lonlat', default=None, type=str, help='a tuple, if set, the tile will have this exact size in pixels, regardless the physical size. For instance --pixels_lonlat [100,100]')
-    dwn_parser.add_argument('--meters_per_pixel', default=None, type=str, help='an int, if set, the tile pixel size will be computed to match the requested meters per pixel')
+    dwn_parser.add_argument('--meters_per_pixel', default=None, type=str, help='an int, if set, the tile pixel size will be computed to match the requested meters per pixel. You must use exactly one of --meters_per_pixel or --pixels_lonlat.')
     dwn_parser.add_argument('--max_downloads', default=None, type=str, help='max number of tiles to download.')
     dwn_parser.add_argument('--shuffle', default=False, action='store_true', help='if set, the order of tile downloading will be shuffled.')
     dwn_parser.add_argument('--skip_if_exists', default=False, action='store_true', help='if set, tiles already existing in the destination folder will not be downloaded.')
@@ -69,10 +69,9 @@ def main():
     elif args.cmd == 'download':
 
         print ("downloading tiles from GEE")
-        print ("XXXX skip", args.skip_if_exists)
         try:
             download(   tiles_file        = args.tiles_file, 
-                        gee_image_codestr = args.gee_image_codestr, 
+                        gee_image_pycode  = args.gee_image_pycode, 
                         dataset_name      = args.dataset_name, 
                         pixels_lonlat     = args.pixels_lonlat, 
                         meters_per_pixel  = args.meters_per_pixel, 
