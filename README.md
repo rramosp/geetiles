@@ -2,7 +2,7 @@
 
 ## download Google Earth Engine datasets to tiles as geotiff arrays
 
-Uses the [Google Earth Engine High Volume Endpoint](https://developers.google.com/earth-engine/cloud/highvolume) which, according the doc
+Uses the [Google Earth Engine High Volume Endpoint](https://developers.google.com/earth-engine/cloud/highvolume) which, according to the documentation:
 
 > This service is designed to support a much larger number of simultaneous requests per user, but provides less caching, so it's best for small queries that don't involve any sort of aggregation (like fetching tiles from pre-built images).
 
@@ -75,4 +75,4 @@ assuming the file `crops.py` contains the following code
                                            '02a50f', 'green', 'yellow'])
 
 
-The `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles-file`.
+The file `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles-file`.
