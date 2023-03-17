@@ -61,7 +61,7 @@ If using `esa-world-cover`, which is an alias to [ESA WorldCover 10m v100](https
 
 ### Using your own code to define the GEE source image object.
 
-    geed download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode crops.py --dataset_name crop --pixels_lonlat [100,100] --skip_if_exists --skip_confirm
+    geed download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode crops.py --dataset_name crop --pixels_lonlat [100,100] --skip_if_exists --skip_confirm --n_processes 20
 
 assuming the file `crops.py` contains the following code
 

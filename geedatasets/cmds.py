@@ -25,6 +25,7 @@ def download(tiles_file,
              skip_if_exists,
              dtype,
              ee_auth_mode,
+             n_processes,
              skip_confirm=False):
     
     # sanity check
@@ -55,6 +56,7 @@ shuffle            {shuffle}
 skip_if_exists     {skip_if_exists}
 dtype              {dtype}
 ee_auth_mode       {ee_auth_mode}
+n_processes        {n_processes}
 
         """)
     

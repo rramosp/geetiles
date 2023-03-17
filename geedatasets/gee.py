@@ -104,7 +104,7 @@ def download_tiles(
     if max_downloads is not None:
         gtiles = gtiles[:max_downloads]
 
-    print (f"downloading {len(gtiles)} tiles", flush=True)                                    
+    print (f"downloading {len(gtiles)} tiles. showing random progress of parallel downloading.", flush=True)                                    
     _gee_get_tile_progress_period = np.max([len(gtiles)//100,1])
     pool = multiprocessing.Pool(n_processes)
     pool.starmap(_get_tile, enumerate(gtiles))

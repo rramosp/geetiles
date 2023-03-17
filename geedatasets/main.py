@@ -37,6 +37,7 @@ def main():
     dwn_parser.add_argument('--skip_confirm', default=False, action='store_true', help='if set, proceeds with no user confirmation.')
     dwn_parser.add_argument('--dtype', default='uint8', type=str, help='numeric data type to store the images.')
     dwn_parser.add_argument('--ee_auth_mode', default=None, type=str, help='gee auth mode, see https://developers.google.com/earth-engine/apidocs/ee-authenticate.')
+    dwn_parser.add_argument('--n_processes', default=10, type=int, help='number of parallel processes.')
     
     print ("-----------------------------------------------------------")
     print (f"Google Earth Engine dataset extractor utility {__version__}")
@@ -46,25 +47,25 @@ def main():
     if args.cmd == 'grid':
         print ("making grid", flush=True)
 
-        make_grid(aoi_wkt_file=args.aoi_wkt_file, 
-                  chip_size_meters=args.chip_size_meters, 
-                  aoi_name=args.aoi_name, 
-                  dest_dir=args.dest_dir)
+        make_grid(aoi_wkt_file     = args.aoi_wkt_file, 
+                  chip_size_meters = args.chip_size_meters, 
+                  aoi_name         = args.aoi_name, 
+                  dest_dir         = args.dest_dir)
 
     elif args.cmd == 'random':
         print ("making random partitions", flush=True)
-        make_random_partitions(aoi_wkt_file=args.aoi_wkt_file, 
-                               max_rectangle_size_meters=args.max_rectangle_size_meters, 
-                               aoi_name=args.aoi_name, 
-                               dest_dir=args.dest_dir)
+        make_random_partitions(aoi_wkt_file              = args.aoi_wkt_file, 
+                               max_rectangle_size_meters = args.max_rectangle_size_meters, 
+                               aoi_name                  = args.aoi_name, 
+                               dest_dir                  = args.dest_dir)
         
     elif args.cmd == 'select':
         print ("selecting partitions", flush=True)
         select_partitions(orig_shapefile = args.orig_shapefile,
-                          aoi_wkt_file = args.aoi_wkt_file, 
-                          aoi_name = args.aoi_name, 
+                          aoi_wkt_file   = args.aoi_wkt_file, 
+                          aoi_name       = args.aoi_name, 
                           partition_name = args.partition_name,
-                          dest_dir = args.dest_dir)
+                          dest_dir       = args.dest_dir)
         
     elif args.cmd == 'download':
 
@@ -80,7 +81,8 @@ def main():
                         skip_if_exists    = args.skip_if_exists,
                         dtype             = args.dtype,
                         ee_auth_mode      = args.ee_auth_mode,
-                        skip_confirm      = args.skip_confirm 
+                        skip_confirm      = args.skip_confirm, 
+                        n_processes       = args.n_processes
                     )
         except ValueError as e:
             print ("ERROR.", e)
