@@ -1,6 +1,7 @@
 from setuptools import setup
 
 setup(name='geetiles',
+      description="download Google Earth Engine datasets to tiles as geotiff arrays",
       install_requires=['matplotlib','numpy', 'pandas','joblib',
                         'progressbar2', 'psutil', 'scipy', 'shapely',
                         'geopandas', 'pyproj', 'rasterio'
