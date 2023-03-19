@@ -16,9 +16,56 @@ from . import utils
 epsg4326 = utils.epsg4326
 
 
+def split(tiles_file, 
+          nbands, 
+          angle,
+          train_pct, 
+          test_pct, 
+          val_pct,
+          foreign_tiles_name=None):
+    
+    p = partitions.PartitionSet.from_file(tiles_file)
+    if foreign_tiles_name is None:
+        p.split(nbands=nbands, angle=angle, 
+                        train_pct=train_pct, test_pct=test_pct, val_pct=val_pct)
+    else:
+        p.split_per_partitions(nbands=nbands, angle=angle, 
+                            train_pct=train_pct, test_pct=test_pct, val_pct=val_pct, 
+                            other_partitions_id=foreign_tiles_name)
+    p.save_splits()
+
+def label_proportions_compute(tiles_file, 
+                              dataset_name):
+    
+    p = partitions.PartitionSet.from_file(tiles_file)
+    print(f"computing proportions for {len(p.data)} partitions")
+    p.add_proportions(dataset_name, n_jobs=1, transform_label_fn=lambda x: str(int(x)))
+    print ("done!")
+
+def label_proportions_from_foreign(tiles_file,
+                                   foreign_tiles_file,
+                                   dataset_name):
+    print ("loading primary tiles from", tiles_file, flush=True)
+    p = partitions.PartitionSet.from_file(tiles_file)
+    print ("loading foreign tiles from", foreign_tiles_file, flush=True)
+    t = partitions.PartitionSet.from_file(foreign_tiles_file) 
+    print ("intersecting geometries and computing label proportions from foreign tiles", flush=True)
+    p.add_foreign_proportions(dataset_name, t)    
+    print ("done!")
+
+
+def intersect_with_foreign(tiles_file, foreign_tiles_file):
+    print ("loading primary tiles from", tiles_file, flush=True)
+    p = partitions.PartitionSet.from_file(tiles_file)
+    print ("loading foreign tiles from", foreign_tiles_file, flush=True)
+    t = partitions.PartitionSet.from_file(foreign_tiles_file) 
+    print ("intersecting geometries with foreign tiles", flush=True)
+    p.add_foreign_partition(t)    
+    print ("done!")
+
+
 def download(tiles_file, 
              gee_image_pycode, 
-             dataset_name, 
              pixels_lonlat, meters_per_pixel, 
              max_downloads,
              shuffle,
@@ -48,7 +95,6 @@ using the following download specficication
 
 tiles_file:        {tiles_file}
 gee_image_pycode   {gee_image_pycode}
-dataset_name       {dataset_name}
 pixels_lonlat      {pixels_lonlat}
 meters_per_pixel   {meters_per_pixel}
 max_downloads      {max_downloads}
@@ -102,8 +148,11 @@ n_processes        {n_processes}
                         .median()\
                         .visualize(min=0, max=4000)
         
+        dataset_name = gee_image_pycode
+        
     elif gee_image_pycode == 'esa-world-cover':
         gee_image = ee.ImageCollection("ESA/WorldCover/v100").first()
+        dataset_name = gee_image_pycode
         
     elif os.path.isfile(gee_image_pycode):
         print (f"evaluating python code at {gee_image_pycode}")
@@ -112,6 +161,7 @@ n_processes        {n_processes}
         try:
             exec(gee_image_pycode, globals())
             gee_image = get_ee_image()
+            dataset_name = get_dataset_name()
         except Exception as e:
             print ("--------------------------------------")
             print (f"error executing your code at {pyfname}")
@@ -121,11 +171,15 @@ n_processes        {n_processes}
     else:
         raise ValueError(f"file {gee_image_pycode} not found")
         
+    print ("-----------------------------------------------")
+    print (f"dataset name is '{dataset_name}'")
+    print ("-----------------------------------------------")
     # download the tiles
     p = partitions.PartitionSet.from_file(tiles_file)
 
     # save gee_image_codestr
     dest_dir = p.get_downloaded_tiles_dest_dir(dataset_name)
+    os.makedirs(dest_dir, exist_ok=True)
     with open(f"{dest_dir}.gee_image_pycode.py", "w") as f:
         f.write(gee_image_pycode)
 
@@ -232,7 +286,7 @@ def build_grid(aoi, chip_size_meters):
     return parts
 
 
-def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, partition_name, dest_dir):
+def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_dir):
     """
     selects the geometries in 'orig_shafile' that have some intersention with aoi,
     assigns them an identifier and saves them in a new file.
@@ -256,6 +310,6 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, partition_name, de
     parts = gpd.GeoDataFrame({'geometry': parts}, crs = CRS.from_epsg(4326))
     parts = partitions.PartitionSet(aoi_name, data=parts)
     print ()
-    parts.save_as(dest_dir, partition_name)
+    parts.save_as(dest_dir, tiles_name)
 
     return parts

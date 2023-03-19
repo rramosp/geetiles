@@ -25,7 +25,7 @@ this generates file `./lux_partitions_aschips_14c55eb7d417f.geojson`. Use a tool
 
 ### 2. download tiles
 
-    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode 'sentinel2-rgb-median-2020' --dataset_name s2 --pixels_lonlat [100,100] --skip_if_exists --skip_confirm
+    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode sentinel2-rgb-median-2020 --pixels_lonlat [100,100] --skip_if_exists
 
 
 this fills the folder `lux_partitions_aschips_14c55eb7d417f/s2` with RGB geotiff images of size 100x100 pixels.
@@ -43,20 +43,18 @@ If using `esa-world-cover` as `gee_image_pycode`, which is an alias to [ESA Worl
 
 ### Other ways to create the set of tiles (shapes) 
 
-- As random partitions with at most 5km size length.
+- As random partitions with at most 5km size length (figure below left).
 
 
       geet random --aoi_wkt_file luxembourg.wkt  --max_rectangle_size_meters 20000 --aoi_name lux --dest_dir .
 
 
-<center><img src='imgs/luxembourg-random-5k.png' width=300></center>
+- Using the reference administrative divisions in at [EU Eurostat](https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/countries) (figure below right)
 
+      geet select --orig_shapefile COMM_RG_01M_2016_4326.zip --aoi_wkt_file notebooks/luxembourg.wkt --tiles_name communes --aoi_name lux --dest_dir .
 
-- Using the reference administrative divisions in at [EU Eurostat](https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/countries)
-
-      geet select --orig_shapefile COMM_RG_01M_2016_4326.shp --aoi_wkt_file notebooks/luxembourg.wkt --partition_name comms --aoi_name lux --dest_dir .
-
-<center><img src='imgs/luxembourg-communes.png' width=300></center>
+<center><img src='imgs/luxembourg-random-5k.png' width=285>
+<img src='imgs/luxembourg-communes.png' width=300></center>
 
 
 ### Using your own code to define the GEE source image object.
@@ -74,5 +72,56 @@ assuming the file `crops.py` contains the following code
                                 palette = ['black', 'orange', 'brown', 
                                            '02a50f', 'green', 'yellow'])
 
+        def get_dataset_name():
+            return 'crops'
+
 
 The `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles-file`.
+
+### Split geometries in train, test, val using geographic bands
+
+With a certain angle
+
+    geet split --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --nbands 8 --train_pct .5 --test_pct 0.3 --val_pct 0.2  --angle 0.78
+
+Keeping chips within the same coarser geometry in the same split. In this case, the train/test/val proportions may vary from the ones specified as chips will be distributed across the coarser geometries. First we must intersect the geometries
+
+    geet intersect --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --foreign_tiles_file lux_partitions_communes_1a471c686e053.geojson
+
+and then, do the split
+
+    geet split --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --nbands 8 --train_pct .5 --test_pct 0.3 --val_pct 0.2  --angle 0.785 --foreign_tiles_name communes
+
+here is how it would result.
+<center>
+<img src='imgs/luxembourg-bands.png' width=300>
+<img src='imgs/luxembourg-bands-communes.png' width=300>
+</center>
+
+### Computing label proportions
+
+With respect to a dataset downloaded with segmentation labels.
+
+    geet lp.compute --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --dataset_name esa-world-cover
+
+We can also add the label proportions of the coarser tile in which each chip is embedded. First, we need to download the labels for each coarser tile from GEE.
+
+    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --gee_image_pycode esa-world-cover  --pixels_lonlat [100,100] --skip_if_exists 
+
+then, compute the label proportions at this coarser tiles:
+
+    geet lp.compute --tiles_file lux_partitions_communes_1a471c686e053.geojson --dataset_name esa-world-cover
+
+and then compute the label proportions from the coarser tiles.
+
+    geet lp.from_foreign --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --foreign_tiles_file lux_partitions_communes_1a471c686e053.geojson --dataset_name esa-world-cover
+
+The resulting proportions are added in the corresponding `tiles_file`
+
+<img src='imgs/dataframe.png' width=800>
+
+
+### Some notes
+
+- the hash codes in the name files are computed using the participating geometries.
+- the splits are saved both as a column in the corresponding `tiles_file` (which is a `geojson`) and in a separte `csv` file. This is to enable fast loading from `csv` (as loading from `geojson` might take a while, especially for large dataset).

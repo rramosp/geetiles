@@ -236,25 +236,39 @@ class PartitionSet:
 
         r = utils.mParallel(n_jobs=n_jobs, verbose=30)(delayed(f)(i.identifier, i.geometry) for i in self.data.itertuples())
         self.data[f"{image_collection_name}_proportions"] = r
-
+        print()
         self.save()
 
-    def add_cross_proportions(self, image_collection_name, other_partitionset):
+    def add_foreign_proportions(self, image_collection_name, foreign_partitionset):
         """
         add class proportions of the geometries of this partitionset when embedded in a coarser partitionset.
-        see Partition.compute_cross_proportions below
+        see Partition.compute_foreign_proportions below
         """
         parts = self.get_partitions()
         proportions = []
         for part in pbar(parts):
-            cross_proportions, identifier = part.compute_cross_proportions(image_collection_name, other_partitionset)
-            proportions.append({'partition_id': identifier, 
-                                'proportions': cross_proportions})
-        self.data[f"{image_collection_name}_proportions_at_{other_partitionset.partitions_name}"] = proportions
+            foreign_proportions, foreign_identifier = part.compute_foreign_proportions(image_collection_name, foreign_partitionset)
+            proportions.append({'partition_id': foreign_identifier, 
+                                'proportions': foreign_proportions})
+        colname = f"{image_collection_name}_proportions_at_{foreign_partitionset.partitions_name}"
+        self.data[colname] = proportions
+        foreign_name = foreign_partitionset.origin_file[foreign_partitionset.origin_file.find('partitions_')+11:].split("_")[0]
+        print (f"using foreign partition name '{foreign_name}'")
+        self.data[f'foreignid_{foreign_name}'] = [i['partition_id'] for i in self.data[colname]]
         self.save()
 
-    def split(self, nbands, angle, train_pct, test_pct, val_pct, split_col_name='split'):
-        
+    def add_foreign_partition(self, foreign_partitionset):
+        """
+        add the largest foreign intersection partition for each geometries of this partitionset when embedded in a coarser partitionset.
+        see Partition.compute_foreign_partition below
+        """
+        parts = self.get_partitions()
+        foreign_name = foreign_partitionset.origin_file[foreign_partitionset.origin_file.find('partitions_')+11:].split("_")[0]
+        print (f"using foreign partition name '{foreign_name}'")
+        self.data[f'foreignid_{foreign_name}'] = [part.compute_foreign_partition(foreign_partitionset) for part in pbar(parts)]
+        self.save()
+
+    def split(self, nbands, angle, train_pct, test_pct, val_pct, split_col_name='split'):        
         """
         splits the geometries in train, test, val by creating spatial bands
         and assigning each band to train, test or val according to the pcts specified.
@@ -266,7 +280,7 @@ class PartitionSet:
                 as much as possible.
         """
         if angle<-np.pi/2 or angle>np.pi/2:
-            raise ValueError("angle must be between 0 and pi/2")
+            raise ValueError("angle must be between -pi/2 and pi/2")
             
         p = self
         coords = np.r_[[np.r_[i.envelope.boundary.coords].mean(axis=0) for i in p.data.geometry]]
@@ -315,37 +329,29 @@ class PartitionSet:
         self.data[split_col_name] = split
 
         
-    def split_per_partitions(self, nbands, angle, train_pct, test_pct, val_pct, image_collection_name, other_partitions_id):
+    def split_per_partitions(self, nbands, angle, train_pct, test_pct, val_pct, other_partitions_id):
         """
         splits the geometries (as in 'split'), but modifies the result keeping together 
         in the same split all geometries within the same partition.
         
-        must have previously run 'add_cross_proportions'.
+        must have previously run 'add_foreign_proportions'.
         """
         self.split(nbands=nbands, angle=angle, 
-                train_pct=train_pct, 
-                test_pct=test_pct, 
-                val_pct=val_pct, split_col_name='tmp_split')
+                  train_pct=train_pct, 
+                  test_pct=test_pct, 
+                  val_pct=val_pct, split_col_name='split')
         
-        # gather the id of the other partitions
-        self.data['tmp_partition_id'] =  [i['partition_id'] \
-                                        for i in self.data[f"{image_collection_name}_proportions_at_{other_partitions_id}"].values]
+        self.data[f'split_{other_partitions_id}'] = self.data.groupby(f'foreignid_{other_partitions_id}')[['split']]\
+                                                             .transform(lambda x: pd.Series(x).value_counts().index[0])
 
-        # group the splits and get the most frequent one
-        self.data[f'split_{other_partitions_id}'] = self.data.groupby('tmp_partition_id')[['tmp_split']]\
-                                                    .transform(lambda x: pd.Series(x).value_counts().index[0])
         
-        self.data.drop('tmp_partition_id', axis=1, inplace=True)
-        self.data.drop('tmp_split', axis=1, inplace=True)
-
     def save_splits(self):
         # save the split into a separate file for fast access
         fname = os.path.splitext(self.origin_file)[0] + "_splits.csv"
         splits_df = self.data[[c for c in self.data.columns if ('split' in c and c!='split_nb') or c=='identifier']]
         splits_df.to_csv(fname, index=False)
-        print (f"all splits saved to {fname}")
-
         self.save()
+        print (f"all splits saved to {fname}")
 
     @classmethod
     def from_file(cls, filename):
@@ -379,7 +385,22 @@ class Partition:
         r = {k:v/total for k,v in r.items()}
         return r
     
-    def compute_cross_proportions(self, image_collection_name, other_partitionset):
+    def compute_foreign_partition(self, foreign_partition_set):
+        """
+        returns the id of the foreign partition (geometry) intersecting this one
+        """        
+        t = foreign_partition_set
+        relevant = t.data[[i.intersects(self.geometry) for i in t.data.geometry.values]]
+        w = np.r_[[self.geometry.intersection(i).area for i in relevant.geometry]]
+
+        if len(relevant)>0:
+            largest_foreign_partition_id = relevant.identifier.values[np.argmax(w)]
+        else:
+            largest_foreign_partition_id = -1
+
+        return largest_foreign_partition_id
+
+    def compute_foreign_proportions(self, image_collection_name, foreign_partition_set):
         """
         compute class proportions of this geometry when embedded in a coarser partitionset.
         class proportions are computed by (1) obtaining the intersecting partitions on the
@@ -388,20 +409,20 @@ class Partition:
         
         returns: a list of proportions, the id of the geometry in "other_partitionset" with greater contribution
         """
-        t = other_partitionset
+        t = foreign_partition_set
         relevant = t.data[[i.intersects(self.geometry) for i in t.data.geometry.values]]
 
         # weight each higher grained geometry by % of intersection with this geometry
         w = np.r_[[self.geometry.intersection(i).area for i in relevant.geometry]]
         w = w / w.sum()
-        cross_proportions = dict ((pd.DataFrame(list(relevant[f"{image_collection_name}_proportions"].values)) * w.reshape(-1,1) ).sum(axis=0))
+        foreign_proportions = dict ((pd.DataFrame(list(relevant[f"{image_collection_name}_proportions"].values)) * w.reshape(-1,1) ).sum(axis=0))
 
         if len(w)>0:
-            largest_other_partition_id = relevant.identifier.values[np.argmax(w)]
+            largest_foreign_partition_id = relevant.identifier.values[np.argmax(w)]
         else:
-            largest_other_partition_id = -1
+            largest_foreign_partition_id = -1
 
-        return cross_proportions, largest_other_partition_id
+        return foreign_proportions, largest_foreign_partition_id
 
     def compute_proportions_by_interesection(self, other_partitions):
         pass        
