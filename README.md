@@ -53,8 +53,7 @@ If using `esa-world-cover` as `gee_image_pycode`, which is an alias to [ESA Worl
 
       geet select --orig_shapefile COMM_RG_01M_2016_4326.zip --aoi_wkt_file notebooks/luxembourg.wkt --tiles_name communes --aoi_name lux --dest_dir .
 
-<center><img src='imgs/luxembourg-random-5k.png' width=285>
-<img src='imgs/luxembourg-communes.png' width=300></center>
+<center><img src='imgs/luxembourg-random-5k.png' width=285> <img src='imgs/luxembourg-communes.png' width=300></center>
 
 
 ### Using your own code to define the GEE source image object.
@@ -94,8 +93,7 @@ and then, do the split
 
 here is how it would result.
 <center>
-<img src='imgs/luxembourg-bands.png' width=300>
-<img src='imgs/luxembourg-bands-communes.png' width=300>
+<img src='imgs/luxembourg-bands.png' width=300> <img src='imgs/luxembourg-bands-communes.png' width=300>
 </center>
 
 ### Computing label proportions
