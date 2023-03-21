@@ -1,6 +1,7 @@
 import sys
 import hashlib
 import numpy as np
+import pandas as pd
 from joblib import Parallel
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
@@ -19,6 +20,16 @@ class mParallel(Parallel):
             fmsg = '[%s]: %s' % (self, msg % msg_args)
             sys.stdout.write('\r ' + fmsg)
             sys.stdout.flush()
+
+def expand_dict_column(d, col):
+    """
+    expands a column with a list of dictionaries 
+    into indivual columns for each key
+    """
+    t = pd.DataFrame(list(d[col].values), index=d.index).fillna(0)
+    t.columns = [f'{col}__{i}' for i in t.columns]
+    return d.join(t)
+
 
 def get_binary_mask(geometry, raster_shape):
     """

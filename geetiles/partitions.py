@@ -3,9 +3,8 @@ import re
 import os
 import numpy as np
 import geopandas as gpd
-import pandas as pd
 import shapely as sh
-import os
+import pandas as pd
 from skimage.io import imread
 
 from pyproj import CRS
@@ -219,6 +218,24 @@ class PartitionSet:
         print (f"saved to {self.origin_file}")
 
 
+
+    def expand_proportions(self):
+        """
+        expands proportions into separate columns for easy visualization in GIS software
+        """
+        cols_proportions = [i for i in self.data.columns if "_proportions" in i]
+        if len(cols_proportions)==0:
+            print ("no proportions found in", self.origin_file)
+            return
+        
+        for col in cols_proportions:
+            self.data = utils.expand_dict_column(self.data, col)
+            
+        f,ext = os.path.splitext(self.origin_file)
+        expanded_fname = f'{f}_expanded{ext}'
+        self.data.to_file(expanded_fname, driver='GeoJSON')
+        print ("saved expanded file to", expanded_fname)
+
     def add_proportions(self, image_collection_name, n_jobs=5, transform_label_fn=lambda x: x):
         """
         adds proportions from an image collection with the same geometry (such when this partitionset
@@ -246,15 +263,18 @@ class PartitionSet:
         """
         parts = self.get_partitions()
         proportions = []
+        foreign_ids = []
         for part in pbar(parts):
             foreign_proportions, foreign_identifier = part.compute_foreign_proportions(image_collection_name, foreign_partitionset)
-            proportions.append({'partition_id': foreign_identifier, 
-                                'proportions': foreign_proportions})
+            #proportions.append({'partition_id': foreign_identifier, 
+            #                    'proportions': foreign_proportions})
+            proportions.append(foreign_proportions)
+            foreign_ids.append(foreign_identifier)
         colname = f"{image_collection_name}_proportions_at_{foreign_partitionset.partitions_name}"
         self.data[colname] = proportions
         foreign_name = foreign_partitionset.origin_file[foreign_partitionset.origin_file.find('partitions_')+11:].split("_")[0]
-        print (f"using foreign partition name '{foreign_name}'")
-        self.data[f'foreignid_{foreign_name}'] = [i['partition_id'] for i in self.data[colname]]
+        #self.data[f'foreignid_{foreign_name}'] = [i['partition_id'] for i in self.data[colname]]
+        self.data[f'foreignid_{foreign_name}'] = foreign_ids
         self.save()
 
     def add_foreign_partition(self, foreign_partitionset):

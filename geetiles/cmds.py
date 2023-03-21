@@ -334,12 +334,20 @@ def zip_dataset(tiles_file,
     except:
         raise ValueError("'label_map' must be a list of ints such as --label_map [10,20,95,100]")
 
+    if not 0 in label_map:
+        print ("adding class 0 to label map")
+        label_map = [0] + label_map
+
+    labelmap = {str(i):j for i,j in enumerate(label_map)}
+    print ("using label map", labelmap)
+
     basedir = os.path.dirname(tiles_file)
     if basedir == "":
         basedir = "."
     filebase, _ = os.path.splitext(tiles_file)
     aoi_name = os.path.basename(tiles_file).split("_")[0]
     splits_file = f'{basedir}/{filebase}_splits.csv'
+    expanded_file = f'{basedir}/{filebase}_expanded.geojson'
     destination_dir = f"{basedir}/{aoi_name}_{images_dataset_name}"
     if labels_dataset_name is not None:
         destination_dir += f"_{labels_dataset_name}"
@@ -354,19 +362,24 @@ def zip_dataset(tiles_file,
         filebase, extension = os.path.splitext(filename)
         if filebase.endswith('_splits'):
             r = "_".join(filebase.split("_")[:-2])+"_splits"+extension
+        elif filebase.endswith('_expanded'):
+            r = "_".join(filebase.split("_")[:-2])+"_expanded"+extension
         else:
             r = "_".join(filebase.split("_")[:-1])+extension            
         return r
     
-    for filename in [tiles_file, foreign_tiles_file, splits_file]:
+    print ("creating extended file for easy visualization of label proportions")
+    p = partitions.PartitionSet.from_file(tiles_file)
+    p.expand_proportions()
+
+    for filename in [tiles_file, foreign_tiles_file, splits_file, expanded_file]:
         if filename is not None and os.path.isfile(filename):
             shutil.copyfile(f"{filename}", f"{destination_dir}/{remove_hash(os.path.basename(filename))}")
 
     if readme_file is not None:
         shutil.copyfile(readme_file, f"{destination_dir}/README.txt")
 
-    labelmap = {str(i):j for i,j in enumerate(label_map)}
-    print ("using label map", label_map)
+
 
     labelmapi = {str(v):k for k,v in labelmap.items()}
 
@@ -411,7 +424,7 @@ def zip_dataset(tiles_file,
             props['partitions_aschip'] = map_proportions(i[f'{labels_dataset_name}_proportions'].copy())
 
             props[f'partitions_{foreign_tiles_name}'] = i[f'{labels_dataset_name}_proportions_at_{foreign_tiles_name}'].copy()
-            props[f'partitions_{foreign_tiles_name}']['proportions'] = map_proportions(props[f'partitions_{foreign_tiles_name}']['proportions'])
+            props[f'partitions_{foreign_tiles_name}'] = map_proportions(props[f'partitions_{foreign_tiles_name}'])
 
             r['label_proportions'] = props
             with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
