@@ -1,4 +1,4 @@
-Region of Interest (ROI) is comprised of the Belgium, the Netherlands and Luxembour
+Region of Interest (ROI) is Luxembourg
 
 We use the communes adminitrative division which is standardized across Europe by EUROSTAT at:
 https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units
@@ -30,7 +30,8 @@ images: Sentinel2 rgb from 2020-01-01 to 2020-31-12
 labels: ESA WorldCover 10m V100
         labels mapped to the interval [1,11] according to the following map
         { 0:0, 10: 1, 20:2, 30:3, 40:4, 50:5, 60:6, 70:7, 80:8, 90:9, 95:10, 100:11 }
-        pixel value zero is reserved for invalid data (no cloudless pixels, or out of ROI)
+        pixel value zero is reserved for invalid data (no cloudless pixels, errors
+        in data, etc. )
         see https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100
         
         Google Earth Engine Python code
