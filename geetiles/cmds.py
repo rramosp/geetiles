@@ -372,9 +372,16 @@ def zip_dataset(tiles_file,
     p = partitions.PartitionSet.from_file(tiles_file)
     p.expand_proportions()
 
+    # copy files
     for filename in [tiles_file, foreign_tiles_file, splits_file, expanded_file]:
         if filename is not None and os.path.isfile(filename):
             shutil.copyfile(f"{filename}", f"{destination_dir}/{remove_hash(os.path.basename(filename))}")
+
+    # splits file is just call 'splits.csv'
+    for filename in [splits_file]:
+        if filename is not None and os.path.isfile(filename):
+            shutil.copyfile(f"{filename}", f"{destination_dir}/splits.csv")
+
 
     if readme_file is not None:
         shutil.copyfile(readme_file, f"{destination_dir}/README.txt")

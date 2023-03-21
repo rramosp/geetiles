@@ -39,20 +39,20 @@ def main():
     dwn_parser.add_argument('--n_processes', default=10, type=int, help='number of parallel processes.')
 
     int_parser = subparsers.add_parser('intersect', help='for each tile, it gets the largest tile id from another set intersecting it.')
-    int_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
+    int_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
     int_parser.add_argument('--foreign_tiles_file', required=True, type=str, help='the other tile set.')
 
     lpc_parser = subparsers.add_parser('lp.compute', help='computes labels proportions from downloaded dataset.')
-    lpc_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
+    lpc_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
     lpc_parser.add_argument('--dataset_name', required=True, type=str, help='name for the downloaded dataset to use. Must be a dataset with integer pixels denoting classes or labels.')
 
     lpf_parser = subparsers.add_parser('lp.from_foreign', help='computes labels proportions from another geometry partition on the same area by interseting geometries.')
-    lpf_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
+    lpf_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
     lpf_parser.add_argument('--foreign_tiles_file', required=True, type=str, help='the tiles file from which labels will be taken to compute proportions by intersecting geometries.')
     lpf_parser.add_argument('--dataset_name', required=True, type=str, help='name for the downloaded dataset to use on foreign_tiles_file. Must be a dataset with integer pixels denoting classes or labels.')
 
     split_parser = subparsers.add_parser('split', help='splits geometries in train, test and val with contiguous bands.')
-    split_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
+    split_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
     split_parser.add_argument('--nbands', required=True, type=int, help='the number of bands to create.')
     split_parser.add_argument('--angle', required=True, type=float, help='angle to use for the bands, in [-1.5707,1.5707] = [-pi/2, pi/2].')
     split_parser.add_argument('--train_pct', required=True, type=float, help='percentage of train data, in [0,1].')
