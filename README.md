@@ -28,7 +28,7 @@ this generates file `./lux_partitions_aschips_14c55eb7d417f.geojson`. Use a tool
     geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode sentinel2-rgb-median-2020 --pixels_lonlat [100,100] --skip_if_exists
 
 
-this fills the folder `lux_partitions_aschips_14c55eb7d417f/s2` with RGB geotiff images of size 100x100 pixels.
+this fills the folder `lux_partitions_aschips_14c55eb7d417f/sentinel2-rgb-median-2020` with RGB geotiff images of size 100x100 pixels.
 
 If using `sentinel2-rgb-median-2020` as `gee_image_pycode`, which is an alias to [Sentinel-2 MSI Level 2-A](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR) GEE dataset, taking the median of the cloudless chips over the year 2020.
 
@@ -49,9 +49,9 @@ If using `esa-world-cover` as `gee_image_pycode`, which is an alias to [ESA Worl
       geet random --aoi_wkt_file luxembourg.wkt  --max_rectangle_size_meters 20000 --aoi_name lux --dest_dir .
 
 
-- Using the reference administrative divisions in at [EU Eurostat](https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/countries) (figure below right)
+- Using the reference administrative divisions at [EU Eurostat](https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/countries) (figure below right)
 
-      geet select --orig_shapefile COMM_RG_01M_2016_4326.zip --aoi_wkt_file notebooks/luxembourg.wkt --tiles_name communes --aoi_name lux --dest_dir .
+      geet select --orig_shapefile COMM_RG_01M_2016_4326.zip --aoi_wkt_file luxembourg.wkt --tiles_name communes --aoi_name lux --dest_dir .
 
 <center><img src='imgs/luxembourg-random-5k.png' width=285> <img src='imgs/luxembourg-communes.png' width=300></center>
 
@@ -104,7 +104,7 @@ With respect to a dataset downloaded with segmentation labels.
 
 We can also add the label proportions of the coarser tile in which each chip is embedded. First, we need to download the labels for each coarser tile from GEE.
 
-    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --gee_image_pycode esa-world-cover  --pixels_lonlat [100,100] --skip_if_exists 
+    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --gee_image_pycode esa-world-cover  --meters_per_pixel 20  --skip_if_exists 
 
 then, compute the label proportions at this coarser tiles:
 
@@ -119,7 +119,11 @@ The resulting proportions are added in the corresponding `tiles_file`
 <img src='imgs/dataframe.png' width=800>
 
 
+### Publishing a dataset
+
+    geet zip.dataset --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --foreign_tiles_file lux_partitions_communes_1a471c686e053.geojson --images_dataset_name sentinel2-rgb-median-2020 --labels_dataset_name esa-world-cover --readme_file README.txt  --label_map [10,20,30,40,50,60,70,80,90,95,100]
+
 ### Some notes
 
-- the hash codes in the name files are computed using the participating geometries.
+- the hash codes in the name files are computed using the participating geometries. This ensures that changing geometries do not override each other(such as for random partitions, or a wkt with slightly different coordinates).
 - the splits are saved both as a column in the corresponding `tiles_file` (which is a `geojson`) and in a separte `csv` file. This is to enable fast loading from `csv` (as loading from `geojson` might take a while, especially for large dataset).

@@ -5,6 +5,8 @@ from joblib import Parallel
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info
+from rasterio.features import rasterize
+import shapely as sh
 
 epsg4326 = CRS.from_epsg(4326)
 
@@ -17,6 +19,37 @@ class mParallel(Parallel):
             fmsg = '[%s]: %s' % (self, msg % msg_args)
             sys.stdout.write('\r ' + fmsg)
             sys.stdout.flush()
+
+def get_binary_mask(geometry, raster_shape):
+    """
+    creates a binary mask for a shapely geometry
+    
+    geometry: a shapely geometry
+    raster_shape: the shape of the resulting raster
+    
+    returns: an np array of shape raster_shape with 0's and 1's corresponding
+             to the binary mask of geometry.
+    """
+    if 'geoms' in dir(geometry):
+        pols = list(geometry.geoms)
+    else:
+        pols = [geometry]
+
+    # get all coords and normalize to [0,1]
+    c = np.r_[[coord for p in pols for coord in p.exterior.coords ]]
+    cpols = [(p.exterior.coords - np.min(c, axis=0))/(np.max(c,axis=0) - np.min(c, axis=0)) for p in pols]
+
+    # switch y (lat)
+    for p in cpols:
+        p[:,1] = 1-p[:,1]
+
+    # scale to raster_shape
+    cpols = [p*np.r_[raster_shape[::-1]] for p in cpols]
+
+    # create polygons and rasterize
+    cpols = [sh.geometry.Polygon(p) for p in cpols]
+    mask = rasterize(cpols, raster_shape, fill=0, default_value=1)
+    return mask
 
 def split_python_code(codestr):
     """

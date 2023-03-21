@@ -29,7 +29,7 @@ def main():
     dwn_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
     dwn_parser.add_argument('--gee_image_pycode', required=True, type=str, help="A file with python code defining a function named get_ee_image that returns a gee Image object, and a function get_dataset_name returning a string. Can also be the string 'sentinel2-rgb-median-2020' or 'esa-world-cover' for built-in definitions")
     dwn_parser.add_argument('--pixels_lonlat', default=None, type=str, help='a tuple, if set, the tile will have this exact size in pixels, regardless the physical size. For instance --pixels_lonlat [100,100]')
-    dwn_parser.add_argument('--meters_per_pixel', default=None, type=str, help='an int, if set, the tile pixel size will be computed to match the requested meters per pixel. You must use exactly one of --meters_per_pixel or --pixels_lonlat.')
+    dwn_parser.add_argument('--meters_per_pixel', default=None, type=int, help='an int, if set, the tile pixel size will be computed to match the requested meters per pixel. You must use exactly one of --meters_per_pixel or --pixels_lonlat.')
     dwn_parser.add_argument('--max_downloads', default=None, type=str, help='max number of tiles to download.')
     dwn_parser.add_argument('--shuffle', default=False, action='store_true', help='if set, the order of tile downloading will be shuffled.')
     dwn_parser.add_argument('--skip_if_exists', default=False, action='store_true', help='if set, tiles already existing in the destination folder will not be downloaded.')
@@ -60,7 +60,13 @@ def main():
     split_parser.add_argument('--val_pct', required=True, type=float, help='percentage of validation data, in [0,1].')
     split_parser.add_argument('--foreign_tiles_name', required=False, default=None, type=str, help='add a split that keeps tiles within coarser foreign tiles together in the same split. Must have run lp.from_foreign before.')
 
-    zip_parser = subparsers.add_parser('zip.dataset', help='downloads tiles from gee.')
+    zip_parser = subparsers.add_parser('zip.dataset', help='assembles chips into pkls and zips all data.')
+    zip_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands.')
+    zip_parser.add_argument('--foreign_tiles_file', default=None, required=False, type=str, help='the tiles file from which foreign label proportions were computed.')
+    zip_parser.add_argument('--images_dataset_name', required=True, type=str, help="name of the dataset with images downloaded following the geometry of 'tiles_file'.")
+    zip_parser.add_argument('--labels_dataset_name', default=None, required=False, type=str, help="name of the dataset with labels downloaded following the geometry of 'tiles_file'.")
+    zip_parser.add_argument('--readme_file', default=None, required=False, type=str, help="name of the README.txt file to add to the zip file.")
+    zip_parser.add_argument('--label_map', required=True, type=str, help="a list of class ids present in the labels dataset to be mapped to the sequence [0,1,..] in the resulting zipped dataset")
 
     print ("-----------------------------------------------------------")
     print (f"Google Earth Engine dataset extractor utility {__version__}")
@@ -135,3 +141,12 @@ def main():
               test_pct           = args.test_pct, 
               val_pct            = args.val_pct,
               foreign_tiles_name = args.foreign_tiles_name)
+        
+    elif args.cmd == 'zip.dataset':
+        print ("zipping dataset")
+        zip_dataset(tiles_file          = args.tiles_file, 
+                    foreign_tiles_file  = args.foreign_tiles_file,
+                    images_dataset_name = args.images_dataset_name, 
+                    labels_dataset_name = args.labels_dataset_name, 
+                    label_map           = args.label_map,
+                    readme_file         = args.readme_file)

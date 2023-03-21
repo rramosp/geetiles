@@ -2,6 +2,8 @@
 import itertools
 import ee
 import os
+import shutil
+import pickle
 from shapely import wkt
 import geopandas as gpd
 import numpy as np
@@ -9,6 +11,10 @@ import shapely as sh
 from joblib import delayed
 from pyproj import CRS
 from progressbar import progressbar as pbar
+from skimage.io import imread
+import pickle
+from zipfile import ZipFile
+
 
 from . import partitions
 from . import utils
@@ -313,3 +319,121 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
     parts.save_as(dest_dir, tiles_name)
 
     return parts
+
+def zip_dataset(tiles_file, 
+                foreign_tiles_file,
+                images_dataset_name, 
+                labels_dataset_name, 
+                label_map,
+                readme_file):
+    
+
+    try:
+        label_map = eval(label_map)
+        label_map = [int(i) for i in label_map]
+    except:
+        raise ValueError("'label_map' must be a list of ints such as --label_map [10,20,95,100]")
+
+    basedir = os.path.dirname(tiles_file)
+    if basedir == "":
+        basedir = "."
+    filebase, _ = os.path.splitext(tiles_file)
+    aoi_name = os.path.basename(tiles_file).split("_")[0]
+    splits_file = f'{basedir}/{filebase}_splits.csv'
+    destination_dir = f"{basedir}/{aoi_name}_{images_dataset_name}"
+    if labels_dataset_name is not None:
+        destination_dir += f"_{labels_dataset_name}"
+
+    s = foreign_tiles_file
+    foreign_tiles_name = s[s.find('_partitions_')+len('_partitions_'):].split("_")[0]
+
+    print ("preparing folders")
+    os.makedirs(f"{destination_dir}/data", exist_ok=True)
+
+    def remove_hash(filename):
+        filebase, extension = os.path.splitext(filename)
+        if filebase.endswith('_splits'):
+            r = "_".join(filebase.split("_")[:-2])+"_splits"+extension
+        else:
+            r = "_".join(filebase.split("_")[:-1])+extension            
+        return r
+    
+    for filename in [tiles_file, foreign_tiles_file, splits_file]:
+        if filename is not None and os.path.isfile(filename):
+            shutil.copyfile(f"{filename}", f"{destination_dir}/{remove_hash(os.path.basename(filename))}")
+
+    if readme_file is not None:
+        shutil.copyfile(readme_file, f"{destination_dir}/README.txt")
+
+    labelmap = {str(i):j for i,j in enumerate(label_map)}
+    print ("using label map", label_map)
+
+    labelmapi = {str(v):k for k,v in labelmap.items()}
+
+    def maplabel(label):
+
+        mlabel = np.zeros_like(label)
+        for v1,v2 in labelmapi.items():
+            mlabel[label==int(v1)] = v2
+
+        return mlabel
+    
+    def map_proportions(proportions):
+        return {str(labelmapi[str(k1)]): v1 for k1,v1 in proportions.items()}
+
+    print ("reading tiles file")
+    # read chip definitions
+    c = gpd.read_file(tiles_file)
+    # gather imgs, labels and proportions 
+    partitionset_dir = os.path.splitext(f"{basedir}/{tiles_file}")[0]
+    for _,i in pbar(c.iterrows(), max_value=len(c)):
+        r = {}
+        img_filename   = f"{partitionset_dir}/{images_dataset_name}/{i.identifier}.tif"
+        label_filename = f"{partitionset_dir}/{labels_dataset_name}/{i.identifier}.tif"
+        if os.path.exists(img_filename):
+            img = imread(img_filename).astype(np.int16)
+            label = imread(label_filename).astype(np.int16)
+            label = maplabel(label)
+            coords = np.r_[i.geometry.envelope.boundary.coords]
+            center_latlon = coords.mean(axis=0)[::-1]
+            cmax = coords.max(axis=0)[::-1]
+            cmin = coords.min(axis=0)[::-1]
+            nw = np.r_[cmax[0], cmin[1]]
+            se = np.r_[cmin[0], cmax[1]]    
+
+            r['chipmean'] = img
+            r['chip_id'] = i.identifier
+            r['label'] = label
+            r['center_latlon'] = center_latlon
+            r['corners'] = { 'nw': nw, 'se': se }
+            
+            props = {}
+            props['partitions_aschip'] = map_proportions(i[f'{labels_dataset_name}_proportions'].copy())
+
+            props[f'partitions_{foreign_tiles_name}'] = i[f'{labels_dataset_name}_proportions_at_{foreign_tiles_name}'].copy()
+            props[f'partitions_{foreign_tiles_name}']['proportions'] = map_proportions(props[f'partitions_{foreign_tiles_name}']['proportions'])
+
+            r['label_proportions'] = props
+            with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
+                pickle.dump(r, f)
+
+    # create zip file
+    print ("zipping all content")
+
+    # Create object of ZipFile
+    zipfile = f"{destination_dir}.zip"
+    with ZipFile(zipfile, 'w') as zip_object:
+        # Traverse all files in directory
+        for folder_name, sub_folders, file_names in os.walk(destination_dir):
+            for filename in file_names:
+                # Create filepath of files in directory
+                file_path = os.path.join(folder_name, filename)
+                # Add files to zip file
+                zip_object.write(file_path, file_path)
+
+    if os.path.exists(zipfile):
+        print(f"dataset zip file created: {zipfile}")
+    else:
+        raise ValueError(f"could not create zip file {zipfile}")
+
+    print ("done!")

@@ -375,11 +375,19 @@ class Partition:
         self.crs = crs
         self.partitionset = partitionset
         self.partitionset_dir = os.path.splitext(self.partitionset.origin_file)[0]
-        
+
+    def get_tif(self, image_collection_name):
+        basedir = self.partitionset_dir + "/" + image_collection_name
+        filename = f"{basedir}/{self.identifier}.tif"
+        img = imread(filename)
+        return img
+    
     def compute_proportions_from_raster(self, image_collection_name, transform_label_fn=lambda x: x):
         basedir = self.partitionset_dir + "/" + image_collection_name
         filename = f"{basedir}/{self.identifier}.tif"
         img = imread(filename)
+        mask = utils.get_binary_mask(self.geometry, img.shape)
+        img = img[mask==1]
         r = {transform_label_fn(k):v for k,v in zip(*np.unique(img, return_counts=True))}        
         total = sum(r.values())
         r = {k:v/total for k,v in r.items()}
