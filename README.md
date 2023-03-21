@@ -119,7 +119,9 @@ The resulting proportions are added in the corresponding `tiles_file`
 <img src='imgs/dataframe.png' width=800>
 
 
-### Publishing a dataset
+### Creating a dataset to share it
+
+This will create a zip file, with a pickle per chip containing a dictionary with the chip image, label and proportions.
 
     geet zip.dataset --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --foreign_tiles_file lux_partitions_communes_1a471c686e053.geojson --images_dataset_name sentinel2-rgb-median-2020 --labels_dataset_name esa-world-cover --readme_file README.txt  --label_map [10,20,30,40,50,60,70,80,90,95,100]
 
