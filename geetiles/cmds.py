@@ -382,11 +382,8 @@ def zip_dataset(tiles_file,
         if filename is not None and os.path.isfile(filename):
             shutil.copyfile(f"{filename}", f"{destination_dir}/splits.csv")
 
-
     if readme_file is not None:
         shutil.copyfile(readme_file, f"{destination_dir}/README.txt")
-
-
 
     labelmapi = {str(v):k for k,v in labelmap.items()}
 
@@ -432,7 +429,7 @@ def zip_dataset(tiles_file,
 
             props[f'partitions_{foreign_tiles_name}'] = i[f'{labels_dataset_name}_proportions_at_{foreign_tiles_name}'].copy()
             props[f'partitions_{foreign_tiles_name}'] = map_proportions(props[f'partitions_{foreign_tiles_name}'])
-
+            props[f'foreignid_{foreign_tiles_name}'] = i[f'foreignid_{foreign_tiles_name}']
             r['label_proportions'] = props
             with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
                 pickle.dump(r, f)

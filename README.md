@@ -75,7 +75,7 @@ assuming the file `crops.py` contains the following code
             return 'crops'
 
 
-The `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles-file`.
+The `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles_file`.
 
 ### Split geometries in train, test, val using geographic bands
 
