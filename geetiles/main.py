@@ -44,7 +44,7 @@ def main():
 
     lpc_parser = subparsers.add_parser('lp.compute', help='computes labels proportions from downloaded dataset.')
     lpc_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
-    lpc_parser.add_argument('--dataset_name', required=True, type=str, help='name for the downloaded dataset to use. Must be a dataset with integer pixels denoting classes or labels.')
+    lpc_parser.add_argument('--labels_dataset_def', required=True, type=str, help='the dataset definition for which to compute proportions. Must have been downloaded previously. See "download --dataset-def".')
 
     lpf_parser = subparsers.add_parser('lp.from_foreign', help='computes labels proportions from another geometry partition on the same area by interseting geometries.')
     lpf_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
@@ -123,7 +123,7 @@ def main():
     elif args.cmd == 'lp.compute':
         print ("computing proportions")
         label_proportions_compute(tiles_file = args.tiles_file, 
-                                  dataset_name = args.dataset_name)      
+                                  labels_dataset_def = args.labels_dataset_def)      
 
     elif args.cmd == 'lp.from_foreign':
         print ("computing proportions from foreign tiles")

@@ -41,11 +41,13 @@ def split(tiles_file,
     p.save_splits()
 
 def label_proportions_compute(tiles_file, 
-                              dataset_name):
+                              labels_dataset_def):
     
+    label_dataset_definition = utils.get_dataset_definition(labels_dataset_def)
+    print ("loading tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
     print(f"computing proportions for {len(p.data)} partitions")
-    p.add_proportions(dataset_name, n_jobs=1, transform_label_fn=lambda x: str(int(x)))
+    p.add_proportions(label_dataset_definition, n_jobs=1)
     print ("done!")
 
 def label_proportions_from_foreign(tiles_file,
@@ -355,6 +357,7 @@ def zip_dataset(tiles_file,
                     print ("removing data from other label datasets")
                     m = m[[c for c in m.columns if not c in remove_columns]]
                     m.to_file(dest_file, driver='GeoJSON')
+
     # splits file is just call 'splits.csv'
     for filename in [splits_file]:
         if filename is not None and os.path.isfile(filename):
@@ -362,15 +365,6 @@ def zip_dataset(tiles_file,
 
     if readme_file is not None:
         shutil.copyfile(readme_file, f"{destination_dir}/README.txt")
-
-    # pass the proportions keys through the same process as labels to map them
-    def map_proportions(proportions):
-        keys = np.r_[list(proportions.keys())].astype(int)
-        mkeys = labels_dataset.process_for_zipping(keys)
-        kmap = {k:mk for k,mk in zip(keys, mkeys)}
-
-        r = {kmap[int(k)]:v for k,v in proportions.items()}
-        return r
 
     print ("reading tiles file")
     # read chip definitions
@@ -385,8 +379,8 @@ def zip_dataset(tiles_file,
         if os.path.exists(img_filename):
 
             img = imread(img_filename).astype(np.int16)
-            if 'process_for_zipping' in dir(images_dataset):
-                img = images_dataset.process_for_zipping(img)
+            if 'map_values' in dir(images_dataset):
+                img = images_dataset.map_values(img)
             
             coords = np.r_[i.geometry.envelope.boundary.coords]
             center_latlon = coords.mean(axis=0)[::-1]
@@ -402,17 +396,16 @@ def zip_dataset(tiles_file,
             
             if labels_dataset_name is not None and os.path.exists(label_filename):
                 label = imread(label_filename).astype(np.int16)
-                if 'process_for_zipping' in dir(labels_dataset):
-                    label = labels_dataset.process_for_zipping(label)
+                if 'map_values' in dir(labels_dataset):
+                    label = labels_dataset.map_values(label)
 
                 r['label'] = label
                 props = {}
                 if f'{labels_dataset_name}_proportions' in i.keys():
-                    props['partitions_aschip'] = map_proportions(i[f'{labels_dataset_name}_proportions'].copy())
+                    props['partitions_aschip'] = i[f'{labels_dataset_name}_proportions'].copy()
 
                 if foreign_tiles_name is not None and f'foreignid_{foreign_tiles_name}' in i.keys():
                     props[f'partitions_{foreign_tiles_name}'] = i[f'{labels_dataset_name}_proportions_at_{foreign_tiles_name}'].copy()
-                    props[f'partitions_{foreign_tiles_name}'] = map_proportions(props[f'partitions_{foreign_tiles_name}'])
                     props[f'foreignid_{foreign_tiles_name}'] = i[f'foreignid_{foreign_tiles_name}']
 
                 if len(props)>0:

@@ -9,6 +9,7 @@ class DatasetDefinition:
     def get_dataset_name(self):
         return 'soilph'
 
-    def process_for_zipping(self, array):
-        return utils.apply_range_map(array, [57,64,80])
+    def map_values(self, array):
+        # take only soil ph at the first level
+        return utils.apply_range_map(array[:,:,0], [53,62])
                      

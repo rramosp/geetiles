@@ -71,6 +71,8 @@ def get_binary_mask(geometry, raster_shape):
     returns: an np array of shape raster_shape with 0's and 1's corresponding
              to the binary mask of geometry.
     """
+    raster_shape = raster_shape[:2]
+
     if 'geoms' in dir(geometry):
         pols = list(geometry.geoms)
     else:
