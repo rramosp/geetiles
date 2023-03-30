@@ -27,7 +27,7 @@ def main():
 
     dwn_parser = subparsers.add_parser('download', help='downloads tiles from gee.')
     dwn_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
-    dwn_parser.add_argument('--gee_image_pycode', required=True, type=str, help="A file with python code defining a function named get_ee_image that returns a gee Image object, and a function get_dataset_name returning a string. Can also be the string 'sentinel2-rgb-median-2020' or 'esa-world-cover' for built-in definitions")
+    dwn_parser.add_argument('--dataset_def', required=True, type=str, help="A file with python code defining a class with the dataset definition. See files under defs/ for examples . Can also be the string 'sentinel2-rgb-median-2020' or 'esa-world-cover' for built-in definitions")
     dwn_parser.add_argument('--pixels_lonlat', default=None, type=str, help='a tuple, if set, the tile will have this exact size in pixels, regardless the physical size. For instance --pixels_lonlat [100,100]')
     dwn_parser.add_argument('--meters_per_pixel', default=None, type=int, help='an int, if set, the tile pixel size will be computed to match the requested meters per pixel. You must use exactly one of --meters_per_pixel or --pixels_lonlat.')
     dwn_parser.add_argument('--max_downloads', default=None, type=str, help='max number of tiles to download.')
@@ -63,10 +63,9 @@ def main():
     zip_parser = subparsers.add_parser('zip.dataset', help='assembles chips into pkls and zips all data.')
     zip_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands.')
     zip_parser.add_argument('--foreign_tiles_file', default=None, required=False, type=str, help='the tiles file from which foreign label proportions were computed.')
-    zip_parser.add_argument('--images_dataset_name', required=True, type=str, help="name of the dataset with images downloaded following the geometry of 'tiles_file'.")
-    zip_parser.add_argument('--labels_dataset_name', default=None, required=False, type=str, help="name of the dataset with labels downloaded following the geometry of 'tiles_file'.")
+    zip_parser.add_argument('--images_dataset_def', required=True, type=str, help="name of the dataset or python file used to download tiles (see 'dataset_def' in 'download').")
+    zip_parser.add_argument('--labels_dataset_def', default=None, required=False, type=str, help="name of the dataset or python file used to download tiles (see 'dataset_def' in 'download').")
     zip_parser.add_argument('--readme_file', default=None, required=False, type=str, help="name of the README.txt file to add to the zip file.")
-    zip_parser.add_argument('--label_map', required=True, type=str, help="a list of class ids present in the labels dataset to be mapped to the sequence [0,1,..] in the resulting zipped dataset")
 
     print ("-----------------------------------------------------------")
     print (f"Google Earth Engine dataset extractor utility {__version__}")
@@ -101,7 +100,7 @@ def main():
         print ("downloading tiles from GEE")
         try:
             download(   tiles_file        = args.tiles_file, 
-                        gee_image_pycode  = args.gee_image_pycode, 
+                        dataset_def       = args.dataset_def, 
                         pixels_lonlat     = args.pixels_lonlat, 
                         meters_per_pixel  = args.meters_per_pixel, 
                         max_downloads     = args.max_downloads,
@@ -146,7 +145,6 @@ def main():
         print ("zipping dataset")
         zip_dataset(tiles_file          = args.tiles_file, 
                     foreign_tiles_file  = args.foreign_tiles_file,
-                    images_dataset_name = args.images_dataset_name, 
-                    labels_dataset_name = args.labels_dataset_name, 
-                    label_map           = args.label_map,
+                    images_dataset_def  = args.images_dataset_def, 
+                    labels_dataset_def  = args.labels_dataset_def, 
                     readme_file         = args.readme_file)
