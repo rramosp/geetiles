@@ -258,11 +258,12 @@ class PartitionSet:
         print()
         self.save()
 
-    def add_foreign_proportions(self, image_collection_name, foreign_partitionset):
+    def add_foreign_proportions(self, label_dataset_definition, foreign_partitionset):
         """
         add class proportions of the geometries of this partitionset when embedded in a coarser partitionset.
         see Partition.compute_foreign_proportions below
         """
+        image_collection_name = label_dataset_definition.get_dataset_name()
         parts = self.get_partitions()
         proportions = []
         foreign_ids = []

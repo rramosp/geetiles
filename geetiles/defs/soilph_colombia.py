@@ -11,5 +11,5 @@ class DatasetDefinition:
 
     def map_values(self, array):
         # take only soil ph at the first level
-        return utils.apply_range_map(array[:,:,0], [53,62])
+        return utils.apply_range_map(array[:,:,0], [52,55])
                      

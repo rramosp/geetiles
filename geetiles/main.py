@@ -49,7 +49,7 @@ def main():
     lpf_parser = subparsers.add_parser('lp.from_foreign', help='computes labels proportions from another geometry partition on the same area by interseting geometries.')
     lpf_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
     lpf_parser.add_argument('--foreign_tiles_file', required=True, type=str, help='the tiles file from which labels will be taken to compute proportions by intersecting geometries.')
-    lpf_parser.add_argument('--dataset_name', required=True, type=str, help='name for the downloaded dataset to use on foreign_tiles_file. Must be a dataset with integer pixels denoting classes or labels.')
+    lpf_parser.add_argument('--labels_dataset_def', required=True, type=str, help='the dataset definition for which to compute proportions. Must have been downloaded previously. See "download --dataset-def".')
 
     split_parser = subparsers.add_parser('split', help='splits geometries in train, test and val with contiguous bands.')
     split_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
@@ -129,7 +129,7 @@ def main():
         print ("computing proportions from foreign tiles")
         label_proportions_from_foreign(tiles_file         = args.tiles_file,
                                        foreign_tiles_file = args.foreign_tiles_file,
-                                       dataset_name       = args.dataset_name)  
+                                       labels_dataset_def = args.labels_dataset_def)  
         
     elif args.cmd == 'split':
         print ("splitting bands")

@@ -52,13 +52,16 @@ def label_proportions_compute(tiles_file,
 
 def label_proportions_from_foreign(tiles_file,
                                    foreign_tiles_file,
-                                   dataset_name):
+                                   labels_dataset_def):
+
+    label_dataset_definition = utils.get_dataset_definition(labels_dataset_def)
+
     print ("loading primary tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
     print ("loading foreign tiles from", foreign_tiles_file, flush=True)
     t = partitions.PartitionSet.from_file(foreign_tiles_file) 
     print ("intersecting geometries and computing label proportions from foreign tiles", flush=True)
-    p.add_foreign_proportions(dataset_name, t)    
+    p.add_foreign_proportions(label_dataset_definition, t)    
     print ("done!")
 
 
@@ -339,7 +342,7 @@ def zip_dataset(tiles_file,
             r = "_".join(filebase.split("_")[:-1])+extension            
         return r
     
-    print ("creating extended file for easy visualization of label proportions")
+    print ("creating expanded file for easy visualization of label proportions")
     p = partitions.PartitionSet.from_file(tiles_file)
     p.expand_proportions()
 

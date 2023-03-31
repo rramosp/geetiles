@@ -191,7 +191,7 @@ def apply_range_map(array, range_map):
     for instance, if range_map is [5,10,12], 
         - values < 5 will become 0
         - values >=5 and <10 will become 1
-        - values >=12 will become 2
+        - values >=10 will become 2
     """
     
     range_map = np.r_[range_map]
