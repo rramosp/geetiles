@@ -13,7 +13,7 @@ from pyproj import CRS
 from progressbar import progressbar as pbar
 from skimage.io import imread
 import pickle
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 
 from . import partitions
@@ -421,7 +421,7 @@ def zip_dataset(tiles_file,
 
     # Create object of ZipFile
     zipfile = f"{destination_dir}.zip"
-    with ZipFile(zipfile, 'w') as zip_object:
+    with ZipFile(zipfile, 'w', compression=ZIP_DEFLATED, compresslevel=9) as zip_object:
         # Traverse all files in directory
         for folder_name, sub_folders, file_names in os.walk(destination_dir):
             for filename in file_names:
