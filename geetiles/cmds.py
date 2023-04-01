@@ -392,7 +392,7 @@ def zip_dataset(tiles_file,
             nw = np.r_[cmax[0], cmin[1]]
             se = np.r_[cmin[0], cmax[1]]    
 
-            r['chipmean'] = img
+            r['chip'] = img
             r['chip_id'] = i.identifier
             r['center_latlon'] = center_latlon
             r['corners'] = { 'nw': nw, 'se': se }
