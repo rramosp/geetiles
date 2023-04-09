@@ -25,16 +25,16 @@ this generates file `./lux_partitions_aschips_14c55eb7d417f.geojson`. Use a tool
 
 ### 2. download tiles
 
-    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode sentinel2-rgb-median-2020 --pixels_lonlat [100,100] --skip_if_exists
+    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --dataset_def sentinel2-rgb-median-2020 --pixels_lonlat [100,100] --skip_if_exists
 
 
 this fills the folder `lux_partitions_aschips_14c55eb7d417f/sentinel2-rgb-median-2020` with RGB geotiff images of size 100x100 pixels.
 
-If using `sentinel2-rgb-median-2020` as `gee_image_pycode`, which is an alias to [Sentinel-2 MSI Level 2-A](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR) GEE dataset, taking the median of the cloudless chips over the year 2020.
+If using `sentinel2-rgb-median-2020` as `dataset_def`, which is an alias to [Sentinel-2 MSI Level 2-A](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR) GEE dataset, taking the median of the cloudless chips over the year 2020.
 
 <center><img src='imgs/sentinel2.png' width=800></center>
 
-If using `esa-world-cover` as `gee_image_pycode`, which is an alias to [ESA WorldCover 10m v100](https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100) GEE dataset.
+If using `esa-world-cover` as `dataset_def`, which is an alias to [ESA WorldCover 10m v100](https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100) GEE dataset.
 
 <center><img src='imgs/landcover.png' width=800></center>
 
@@ -58,24 +58,9 @@ If using `esa-world-cover` as `gee_image_pycode`, which is an alias to [ESA Worl
 
 ### Using your own code to define the GEE source image object.
 
-    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --gee_image_pycode crops.py --dataset_name crop --pixels_lonlat [100,100] --skip_if_exists --skip_confirm --n_processes 20
+    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --dataset_def crops.py --pixels_lonlat [100,100] --skip_if_exists --skip_confirm --n_processes 20
 
-assuming the file `crops.py` contains the following code
-
-        import ee
-
-        def get_ee_image():
-            return ee.Image('USGS/GFSAD1000_V1')\
-                     .select('landcover')\
-                     .visualize(min=0.0, max=5.0,
-                                palette = ['black', 'orange', 'brown', 
-                                           '02a50f', 'green', 'yellow'])
-
-        def get_dataset_name():
-            return 'crops'
-
-
-The `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles-file`.
+where `crops.py` contains a python `class DatasetDefinition` following the structure of the predefined ones under `defs`.  The files `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles_file`.
 
 ### Split geometries in train, test, val using geographic bands
 
@@ -104,7 +89,7 @@ With respect to a dataset downloaded with segmentation labels.
 
 We can also add the label proportions of the coarser tile in which each chip is embedded. First, we need to download the labels for each coarser tile from GEE.
 
-    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --gee_image_pycode esa-world-cover  --meters_per_pixel 20  --skip_if_exists 
+    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --dataset_def esa-world-cover  --meters_per_pixel 20  --skip_if_exists 
 
 then, compute the label proportions at this coarser tiles:
 
@@ -123,7 +108,7 @@ The resulting proportions are added in the corresponding `tiles_file`
 
 This will create a zip file, with a pickle per chip containing a dictionary with the chip image, label and proportions.
 
-    geet zip.dataset --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --foreign_tiles_file lux_partitions_communes_1a471c686e053.geojson --images_dataset_name sentinel2-rgb-median-2020 --labels_dataset_name esa-world-cover --readme_file README.txt  --label_map [10,20,30,40,50,60,70,80,90,95,100]
+    geet zip.dataset --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson --foreign_tiles_file lux_partitions_communes_1a471c686e053.geojson --images_dataset_def sentinel2-rgb-median-2020 --labels_dataset_def esa-world-cover --readme_file README.txt
 
 ### Some notes
 

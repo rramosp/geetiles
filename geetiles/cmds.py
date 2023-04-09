@@ -13,7 +13,7 @@ from pyproj import CRS
 from progressbar import progressbar as pbar
 from skimage.io import imread
 import pickle
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 
 from . import partitions
@@ -41,22 +41,27 @@ def split(tiles_file,
     p.save_splits()
 
 def label_proportions_compute(tiles_file, 
-                              dataset_name):
+                              labels_dataset_def):
     
+    label_dataset_definition = utils.get_dataset_definition(labels_dataset_def)
+    print ("loading tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
     print(f"computing proportions for {len(p.data)} partitions")
-    p.add_proportions(dataset_name, n_jobs=1, transform_label_fn=lambda x: str(int(x)))
+    p.add_proportions(label_dataset_definition, n_jobs=1)
     print ("done!")
 
 def label_proportions_from_foreign(tiles_file,
                                    foreign_tiles_file,
-                                   dataset_name):
+                                   labels_dataset_def):
+
+    label_dataset_definition = utils.get_dataset_definition(labels_dataset_def)
+
     print ("loading primary tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
     print ("loading foreign tiles from", foreign_tiles_file, flush=True)
     t = partitions.PartitionSet.from_file(foreign_tiles_file) 
     print ("intersecting geometries and computing label proportions from foreign tiles", flush=True)
-    p.add_foreign_proportions(dataset_name, t)    
+    p.add_foreign_proportions(label_dataset_definition, t)    
     print ("done!")
 
 
@@ -71,12 +76,11 @@ def intersect_with_foreign(tiles_file, foreign_tiles_file):
 
 
 def download(tiles_file, 
-             gee_image_pycode, 
+             dataset_def, 
              pixels_lonlat, meters_per_pixel, 
              max_downloads,
              shuffle,
              skip_if_exists,
-             dtype,
              ee_auth_mode,
              n_processes,
              skip_confirm=False):
@@ -96,11 +100,14 @@ def download(tiles_file,
             raise ValueError("'pixels_lonlat' must be a tuple of two ints such as --pixels_lonlat [100,100]")
 
 
+    dataset_definition = utils.get_dataset_definition(dataset_def)
+    dtype = dataset_definition.get_dtype()
+
     print (f"""
 using the following download specficication
 
 tiles_file:        {tiles_file}
-gee_image_pycode   {gee_image_pycode}
+dataset_def        {dataset_def}
 pixels_lonlat      {pixels_lonlat}
 meters_per_pixel   {meters_per_pixel}
 max_downloads      {max_downloads}
@@ -140,43 +147,9 @@ n_processes        {n_processes}
 
     ee.Initialize()
 
-    # define gee image object
-    if gee_image_pycode == 'sentinel2-rgb-median-2020':
-        def maskS2clouds(image):
-            qa = image.select('MSK_CLDPRB')
-            mask = qa.lt(5)
-            return image.updateMask(mask)
+    gee_image = dataset_definition.get_gee_image()
+    dataset_name = dataset_definition.get_dataset_name()
 
-        gee_image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-                        .filterDate('2020-01-01', '2020-12-31')\
-                        .map(maskS2clouds)\
-                        .select('B4', 'B3', 'B2')\
-                        .median()\
-                        .visualize(min=0, max=4000)
-        
-        dataset_name = gee_image_pycode
-        
-    elif gee_image_pycode == 'esa-world-cover':
-        gee_image = ee.ImageCollection("ESA/WorldCover/v100").first()
-        dataset_name = gee_image_pycode
-        
-    elif os.path.isfile(gee_image_pycode):
-        print (f"evaluating python code at {gee_image_pycode}")
-        pyfname = gee_image_pycode
-        gee_image_pycode = open(pyfname).read()
-        try:
-            exec(gee_image_pycode, globals())
-            gee_image = get_ee_image()
-            dataset_name = get_dataset_name()
-        except Exception as e:
-            print ("--------------------------------------")
-            print (f"error executing your code at {pyfname}")
-            print ("--------------------------------------")
-            raise e
-        
-    else:
-        raise ValueError(f"file {gee_image_pycode} not found")
-        
     print ("-----------------------------------------------")
     print (f"dataset name is '{dataset_name}'")
     print ("-----------------------------------------------")
@@ -186,8 +159,8 @@ n_processes        {n_processes}
     # save gee_image_codestr
     dest_dir = p.get_downloaded_tiles_dest_dir(dataset_name)
     os.makedirs(dest_dir, exist_ok=True)
-    with open(f"{dest_dir}.gee_image_pycode.py", "w") as f:
-        f.write(gee_image_pycode)
+    with open(f"{dest_dir}.dataset_def.py", "w") as f:
+        f.write(dataset_def)
 
     p.download_gee_tiles(gee_image, dataset_name, 
                          meters_per_pixel = meters_per_pixel, 
@@ -299,7 +272,6 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
     """
     print ("reading orig shapefile", flush=True)
     parts = gpd.read_file(orig_shapefile)
-
     if not  parts.crs == epsg4326:
            raise ValueError("'orig_shapefile' must be in epsg4326, lon/lat degrees "+\
                             f"but found \n{parts.crs}")
@@ -309,11 +281,14 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
     
     print ("selecting geometries", flush=True)
     parts = [p for p in pbar(parts.geometry) if p.intersects(aoi)]
+    if len(parts)==0:
+        raise ValueError("no intersecting geometries found")
     # very small intersections probably are cause by numerical approximations
     # on the borders of the aoi
     parts = [p for p in parts if p.intersection(aoi).area>1e-5]
     
     parts = gpd.GeoDataFrame({'geometry': parts}, crs = CRS.from_epsg(4326))
+    parts.to_file("/tmp/bb.geojson", driver='GeoJSON')
     parts = partitions.PartitionSet(aoi_name, data=parts)
     print ()
     parts.save_as(dest_dir, tiles_name)
@@ -322,24 +297,21 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
 
 def zip_dataset(tiles_file, 
                 foreign_tiles_file,
-                images_dataset_name, 
-                labels_dataset_name, 
-                label_map,
+                images_dataset_def, 
+                labels_dataset_def, 
                 readme_file):
     
 
-    try:
-        label_map = eval(label_map)
-        label_map = [int(i) for i in label_map]
-    except:
-        raise ValueError("'label_map' must be a list of ints such as --label_map [10,20,95,100]")
+    images_dataset = utils.get_dataset_definition(images_dataset_def)
+    images_dataset_name = images_dataset.get_dataset_name()
 
-    if not 0 in label_map:
-        print ("adding class 0 to label map")
-        label_map = [0] + label_map
+    if labels_dataset_def is not None:
+        labels_dataset = utils.get_dataset_definition(labels_dataset_def)
+        labels_dataset_name = labels_dataset.get_dataset_name()
+    else:
+        labels_dataset_def = None
+        labels_dataset_name = None
 
-    labelmap = {str(i):j for i,j in enumerate(label_map)}
-    print ("using label map", labelmap)
 
     basedir = os.path.dirname(tiles_file)
     if basedir == "":
@@ -352,9 +324,12 @@ def zip_dataset(tiles_file,
     if labels_dataset_name is not None:
         destination_dir += f"_{labels_dataset_name}"
 
-    s = foreign_tiles_file
-    foreign_tiles_name = s[s.find('_partitions_')+len('_partitions_'):].split("_")[0]
-
+    if foreign_tiles_file is not None:
+        s = foreign_tiles_file
+        foreign_tiles_name = s[s.find('_partitions_')+len('_partitions_'):].split("_")[0]
+    else:
+        foreign_tiles_name = None
+        
     print ("preparing folders")
     os.makedirs(f"{destination_dir}/data", exist_ok=True)
 
@@ -368,52 +343,54 @@ def zip_dataset(tiles_file,
             r = "_".join(filebase.split("_")[:-1])+extension            
         return r
     
-    print ("creating extended file for easy visualization of label proportions")
+    print ("creating expanded file for easy visualization of label proportions")
     p = partitions.PartitionSet.from_file(tiles_file)
     p.expand_proportions()
 
     # copy files
+    print ("copying metadata files")
     for filename in [tiles_file, foreign_tiles_file, splits_file, expanded_file]:
         if filename is not None and os.path.isfile(filename):
-            shutil.copyfile(f"{filename}", f"{destination_dir}/{remove_hash(os.path.basename(filename))}")
+            dest_file = f"{destination_dir}/{remove_hash(os.path.basename(filename))}"
+            if dest_file.endswith('splits.csv'):
+                # splits file is just called 'splits.csv'
+                dest_file = f"{destination_dir}/splits.csv"
 
-    # splits file is just call 'splits.csv'
-    for filename in [splits_file]:
-        if filename is not None and os.path.isfile(filename):
-            shutil.copyfile(f"{filename}", f"{destination_dir}/splits.csv")
+            shutil.copyfile(f"{filename}", dest_file)
 
+            # remove columns from other datasets in tiles file
+            if filename == tiles_file:
+                m = gpd.read_file(dest_file)
+                remove_columns = [c for c in m.columns if '_proportions' in c and labels_dataset_name is not None and not labels_dataset_name in c]
+                if len(remove_columns)>0:
+                    print ("removing data from other label datasets")
+                    m = m[[c for c in m.columns if not c in remove_columns]]
+                    m.to_file(dest_file, driver='GeoJSON')
 
     if readme_file is not None:
         shutil.copyfile(readme_file, f"{destination_dir}/README.txt")
-
-
-
-    labelmapi = {str(v):k for k,v in labelmap.items()}
-
-    def maplabel(label):
-
-        mlabel = np.zeros_like(label)
-        for v1,v2 in labelmapi.items():
-            mlabel[label==int(v1)] = v2
-
-        return mlabel
-    
-    def map_proportions(proportions):
-        return {str(labelmapi[str(k1)]): v1 for k1,v1 in proportions.items()}
 
     print ("reading tiles file")
     # read chip definitions
     c = gpd.read_file(tiles_file)
     # gather imgs, labels and proportions 
     partitionset_dir = os.path.splitext(f"{basedir}/{tiles_file}")[0]
+    n_skipped_chips = 0
+    n_included_chips = 0
+
+    included_chipids = []
+
     for _,i in pbar(c.iterrows(), max_value=len(c)):
         r = {}
         img_filename   = f"{partitionset_dir}/{images_dataset_name}/{i.identifier}.tif"
-        label_filename = f"{partitionset_dir}/{labels_dataset_name}/{i.identifier}.tif"
+        if labels_dataset_name is not None:
+            label_filename = f"{partitionset_dir}/{labels_dataset_name}/{i.identifier}.tif"
         if os.path.exists(img_filename):
+
             img = imread(img_filename).astype(np.int16)
-            label = imread(label_filename).astype(np.int16)
-            label = maplabel(label)
+            if 'map_values' in dir(images_dataset):
+                img = images_dataset.map_values(img)
+            
             coords = np.r_[i.geometry.envelope.boundary.coords]
             center_latlon = coords.mean(axis=0)[::-1]
             cmax = coords.max(axis=0)[::-1]
@@ -421,28 +398,63 @@ def zip_dataset(tiles_file,
             nw = np.r_[cmax[0], cmin[1]]
             se = np.r_[cmin[0], cmax[1]]    
 
-            r['chipmean'] = img
+            r['chip'] = img
             r['chip_id'] = i.identifier
-            r['label'] = label
             r['center_latlon'] = center_latlon
             r['corners'] = { 'nw': nw, 'se': se }
             
-            props = {}
-            props['partitions_aschip'] = map_proportions(i[f'{labels_dataset_name}_proportions'].copy())
+            if labels_dataset_name is not None and os.path.exists(label_filename):
+                label = imread(label_filename).astype(np.int16)
+                if 'map_values' in dir(labels_dataset):
+                    label = labels_dataset.map_values(label)
 
-            props[f'partitions_{foreign_tiles_name}'] = i[f'{labels_dataset_name}_proportions_at_{foreign_tiles_name}'].copy()
-            props[f'partitions_{foreign_tiles_name}'] = map_proportions(props[f'partitions_{foreign_tiles_name}'])
+                r['label'] = label
+                props = {}
+                if f'{labels_dataset_name}_proportions' in i.keys():
+                    props['partitions_aschip'] = i[f'{labels_dataset_name}_proportions'].copy()
 
-            r['label_proportions'] = props
-            with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
-                pickle.dump(r, f)
+                if foreign_tiles_name is not None and f'foreignid_{foreign_tiles_name}' in i.keys():
+                    props[f'partitions_{foreign_tiles_name}'] = i[f'{labels_dataset_name}_proportions_at_{foreign_tiles_name}'].copy()
+                    props[f'foreignid_{foreign_tiles_name}'] = i[f'foreignid_{foreign_tiles_name}']
+
+                if len(props)>0:
+                    r['label_proportions'] = props
+
+            if labels_dataset is None or\
+               'include_chip_in_dataset' not in dir(labels_dataset) or \
+               labels_dataset.include_chip_in_dataset(r):
+                with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
+                    pickle.dump(r, f)
+                n_included_chips += 1
+                included_chipids.append(r['chip_id'])
+            else:
+                n_skipped_chips += 1
+
+    print (f"including {n_included_chips} chips, and skipped {n_skipped_chips}")
+
+    # remove usused chips from metadata files
+    if n_included_chips < len(c):
+        chip_metafiles = [i for i in os.listdir(destination_dir) if 'aschip' in i]
+        for filename in chip_metafiles:
+            print ("removing unused chips from", filename, flush=True)
+            filename = f"{destination_dir}/{filename}"
+            if filename.endswith("splits.csv"):
+                f = pd.read_csv(filename)
+                f = f[f.identifier.isin(included_chipids)]
+                f.to_csv(filename, index=False)
+            elif filename.endswith(".geojson"):
+                f = gpd.read_file(filename)
+                f = f[f.identifier.isin(included_chipids)]
+                f.to_file(filename, driver='GeoJSON')
+            else:
+                continue
 
     # create zip file
     print ("zipping all content")
 
     # Create object of ZipFile
     zipfile = f"{destination_dir}.zip"
-    with ZipFile(zipfile, 'w') as zip_object:
+    with ZipFile(zipfile, 'w', compression=ZIP_DEFLATED, compresslevel=9) as zip_object:
         # Traverse all files in directory
         for folder_name, sub_folders, file_names in os.walk(destination_dir):
             for filename in file_names:

@@ -229,6 +229,7 @@ class PartitionSet:
             return
         
         for col in cols_proportions:
+            #self.data = self.data[[c for c in self.data.columns if not c.startswith(f"{col}__")]]
             self.data = utils.expand_dict_column(self.data, col)
             
         f,ext = os.path.splitext(self.origin_file)
@@ -236,7 +237,7 @@ class PartitionSet:
         self.data.to_file(expanded_fname, driver='GeoJSON')
         print ("saved expanded file to", expanded_fname)
 
-    def add_proportions(self, image_collection_name, n_jobs=5, transform_label_fn=lambda x: x):
+    def add_proportions(self, labels_dataset_def, n_jobs=5):
         """
         adds proportions from an image collection with the same geometry (such when this partitionset
         is an rgb image collection and image_collection_name contains segmentation masks)
@@ -246,21 +247,24 @@ class PartitionSet:
                                     identifier = identifier, 
                                     geometry = geometry, 
                                     crs = self.data.crs).compute_proportions_from_raster(
-                                                                image_collection_name,
-                                                                transform_label_fn = transform_label_fn,
+                                                                labels_dataset_def
                                                             )
             return proportions
-
-        r = utils.mParallel(n_jobs=n_jobs, verbose=30)(delayed(f)(i.identifier, i.geometry) for i in self.data.itertuples())
-        self.data[f"{image_collection_name}_proportions"] = r
+        
+        if n_jobs==1:
+            r = [f(i.identifier, i.geometry) for i in pbar(self.data.itertuples(), max_value=len(self.data))]
+        else:
+            r = utils.mParallel(n_jobs=n_jobs, verbose=30)(delayed(f)(i.identifier, i.geometry) for i in self.data.itertuples())
+        self.data[f"{labels_dataset_def.get_dataset_name()}_proportions"] = r
         print()
         self.save()
 
-    def add_foreign_proportions(self, image_collection_name, foreign_partitionset):
+    def add_foreign_proportions(self, label_dataset_definition, foreign_partitionset):
         """
         add class proportions of the geometries of this partitionset when embedded in a coarser partitionset.
         see Partition.compute_foreign_proportions below
         """
+        image_collection_name = label_dataset_definition.get_dataset_name()
         parts = self.get_partitions()
         proportions = []
         foreign_ids = []
@@ -402,15 +406,27 @@ class Partition:
         img = imread(filename)
         return img
     
-    def compute_proportions_from_raster(self, image_collection_name, transform_label_fn=lambda x: x):
+    def compute_proportions_from_raster(self, labels_dataset_def):
+
+        # retrieve label array from disk
+        image_collection_name = labels_dataset_def.get_dataset_name()
         basedir = self.partitionset_dir + "/" + image_collection_name
         filename = f"{basedir}/{self.identifier}.tif"
         img = imread(filename)
+
+        # map image values according to dataset definition
+        img = labels_dataset_def.map_values(img)
+
+        # account for proportions only within the geometry 
+        # (in case it does not match the rectangular image)
         mask = utils.get_binary_mask(self.geometry, img.shape)
         img = img[mask==1]
-        r = {transform_label_fn(k):v for k,v in zip(*np.unique(img, return_counts=True))}        
+
+        # compute proportions
+        r = {k:v for k,v in zip(*np.unique(img, return_counts=True))}        
         total = sum(r.values())
-        r = {k:v/total for k,v in r.items()}
+        r = {str(k):v/total for k,v in r.items()}
+
         return r
     
     def compute_foreign_partition(self, foreign_partition_set):
