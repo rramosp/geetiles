@@ -34,7 +34,6 @@ def main():
     dwn_parser.add_argument('--shuffle', default=False, action='store_true', help='if set, the order of tile downloading will be shuffled.')
     dwn_parser.add_argument('--skip_if_exists', default=False, action='store_true', help='if set, tiles already existing in the destination folder will not be downloaded.')
     dwn_parser.add_argument('--skip_confirm', default=False, action='store_true', help='if set, proceeds with no user confirmation.')
-    dwn_parser.add_argument('--dtype', default='uint8', type=str, help='numeric data type to store the images.')
     dwn_parser.add_argument('--ee_auth_mode', default=None, type=str, help='gee auth mode, see https://developers.google.com/earth-engine/apidocs/ee-authenticate.')
     dwn_parser.add_argument('--n_processes', default=10, type=int, help='number of parallel processes.')
 
@@ -106,7 +105,6 @@ def main():
                         max_downloads     = args.max_downloads,
                         shuffle           = args.shuffle,
                         skip_if_exists    = args.skip_if_exists,
-                        dtype             = args.dtype,
                         ee_auth_mode      = args.ee_auth_mode,
                         skip_confirm      = args.skip_confirm, 
                         n_processes       = args.n_processes

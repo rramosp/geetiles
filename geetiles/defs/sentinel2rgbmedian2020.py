@@ -27,3 +27,6 @@ class DatasetDefinition:
                         .visualize(min=0, max=0.3)
         
         return gee_image
+    
+    def get_dtype(self):
+        return 'uint8'

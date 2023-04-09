@@ -229,6 +229,7 @@ class PartitionSet:
             return
         
         for col in cols_proportions:
+            #self.data = self.data[[c for c in self.data.columns if not c.startswith(f"{col}__")]]
             self.data = utils.expand_dict_column(self.data, col)
             
         f,ext = os.path.splitext(self.origin_file)

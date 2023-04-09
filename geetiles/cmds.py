@@ -81,7 +81,6 @@ def download(tiles_file,
              max_downloads,
              shuffle,
              skip_if_exists,
-             dtype,
              ee_auth_mode,
              n_processes,
              skip_confirm=False):
@@ -100,6 +99,9 @@ def download(tiles_file,
         except:
             raise ValueError("'pixels_lonlat' must be a tuple of two ints such as --pixels_lonlat [100,100]")
 
+
+    dataset_definition = utils.get_dataset_definition(dataset_def)
+    dtype = dataset_definition.get_dtype()
 
     print (f"""
 using the following download specficication
@@ -144,8 +146,6 @@ n_processes        {n_processes}
         ee.Authenticate(auth_mode = ee_auth_mode)
 
     ee.Initialize()
-
-    dataset_definition = utils.get_dataset_definition(dataset_def)
 
     gee_image = dataset_definition.get_gee_image()
     dataset_name = dataset_definition.get_dataset_name()
@@ -312,6 +312,7 @@ def zip_dataset(tiles_file,
         labels_dataset_def = None
         labels_dataset_name = None
 
+
     basedir = os.path.dirname(tiles_file)
     if basedir == "":
         basedir = "."
@@ -347,9 +348,14 @@ def zip_dataset(tiles_file,
     p.expand_proportions()
 
     # copy files
+    print ("copying metadata files")
     for filename in [tiles_file, foreign_tiles_file, splits_file, expanded_file]:
         if filename is not None and os.path.isfile(filename):
             dest_file = f"{destination_dir}/{remove_hash(os.path.basename(filename))}"
+            if dest_file.endswith('splits.csv'):
+                # splits file is just called 'splits.csv'
+                dest_file = f"{destination_dir}/splits.csv"
+
             shutil.copyfile(f"{filename}", dest_file)
 
             # remove columns from other datasets in tiles file
@@ -361,11 +367,6 @@ def zip_dataset(tiles_file,
                     m = m[[c for c in m.columns if not c in remove_columns]]
                     m.to_file(dest_file, driver='GeoJSON')
 
-    # splits file is just call 'splits.csv'
-    for filename in [splits_file]:
-        if filename is not None and os.path.isfile(filename):
-            shutil.copyfile(f"{filename}", f"{destination_dir}/splits.csv")
-
     if readme_file is not None:
         shutil.copyfile(readme_file, f"{destination_dir}/README.txt")
 
@@ -374,6 +375,11 @@ def zip_dataset(tiles_file,
     c = gpd.read_file(tiles_file)
     # gather imgs, labels and proportions 
     partitionset_dir = os.path.splitext(f"{basedir}/{tiles_file}")[0]
+    n_skipped_chips = 0
+    n_included_chips = 0
+
+    included_chipids = []
+
     for _,i in pbar(c.iterrows(), max_value=len(c)):
         r = {}
         img_filename   = f"{partitionset_dir}/{images_dataset_name}/{i.identifier}.tif"
@@ -413,8 +419,35 @@ def zip_dataset(tiles_file,
 
                 if len(props)>0:
                     r['label_proportions'] = props
-            with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
-                pickle.dump(r, f)
+
+            if labels_dataset is None or\
+               'include_chip_in_dataset' not in dir(labels_dataset) or \
+               labels_dataset.include_chip_in_dataset(r):
+                with open(f"{destination_dir}/data/{i.identifier}.pkl", "wb") as f:
+                    pickle.dump(r, f)
+                n_included_chips += 1
+                included_chipids.append(r['chip_id'])
+            else:
+                n_skipped_chips += 1
+
+    print (f"including {n_included_chips} chips, and skipped {n_skipped_chips}")
+
+    # remove usused chips from metadata files
+    if n_included_chips < len(c):
+        chip_metafiles = [i for i in os.listdir(destination_dir) if 'aschip' in i]
+        for filename in chip_metafiles:
+            print ("removing unused chips from", filename, flush=True)
+            filename = f"{destination_dir}/{filename}"
+            if filename.endswith("splits.csv"):
+                f = pd.read_csv(filename)
+                f = f[f.identifier.isin(included_chipids)]
+                f.to_csv(filename, index=False)
+            elif filename.endswith(".geojson"):
+                f = gpd.read_file(filename)
+                f = f[f.identifier.isin(included_chipids)]
+                f.to_file(filename, driver='GeoJSON')
+            else:
+                continue
 
     # create zip file
     print ("zipping all content")

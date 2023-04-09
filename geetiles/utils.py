@@ -58,6 +58,9 @@ def expand_dict_column(d, col):
     """
     t = pd.DataFrame(list(d[col].values), index=d.index).fillna(0)
     t.columns = [f'{col}__{i}' for i in t.columns]
+
+    # remove previously existing columns with the same names in d
+    d = d[[c for c in d.columns if not c in t.columns]]
     return d.join(t)
 
 
