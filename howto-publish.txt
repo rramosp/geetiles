@@ -1,3 +1,5 @@
+git tag -a v0.1.4
+git push origin --tags
 rm -rf dist/*
 python setup.py sdist
 twine upload dist/*
