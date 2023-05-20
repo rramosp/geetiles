@@ -5,7 +5,7 @@ setup(name='geetiles',
       long_description_content_type='text/markdown',
       install_requires=['matplotlib','numpy', 'pandas','joblib',
                         'progressbar2', 'psutil', 'scipy', 'shapely',
-                        'geopandas', 'pyproj', 'rasterio'
+                        'geopandas', 'pyproj', 'rasterio', 'retry', 'earthengine-api'
                        ],
       use_scm_version=True,
       setup_requires=['setuptools_scm'],
