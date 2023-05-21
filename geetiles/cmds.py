@@ -257,7 +257,7 @@ def build_grid(aoi, chip_size_meters):
     # create a polygon at each point
     print (f"inspecting {gridx*gridy} chips", flush=True)
 
-    parts = utils.mParallel(n_jobs=7, verbose=30)(delayed(get_polygon)(m, gx, gy, minx, miny) \
+    parts = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_polygon)(m, gx, gy, minx, miny) \
                                             for gx,gy in itertools.product(range(gridx), range(gridy)))
     parts = [i for i in parts if i is not None and aoi.intersects(i)]
     parts = gpd.GeoDataFrame(parts, columns=['geometry'], crs=epsg4326)

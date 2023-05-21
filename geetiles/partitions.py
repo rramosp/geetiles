@@ -47,6 +47,9 @@ class PartitionSet:
             self.data = self.data.to_crs(CRS.from_epsg(4326))
             self.data['identifier'] = [utils.get_region_hash(i) for i in self.data.geometry]
 
+
+        print ("saving tmp data")
+        self.data.to_file("/opt/partition_data.geojson", driver="GeoJSON")
         if region is None:
             self.region = utils.get_boundary(self.data)
                         
