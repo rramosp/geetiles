@@ -32,6 +32,7 @@ class PartitionSet:
         assert not "_" in name, "'name' cannot contain '_'"
         self.name   = name
         self.region = region
+        self.region_utm = None
         self.data   = data
         
         if self.data is not None:
@@ -46,11 +47,19 @@ class PartitionSet:
 
             self.data = self.data.to_crs(CRS.from_epsg(4326))
             self.data['identifier'] = [utils.get_region_hash(i) for i in self.data.geometry]
+            
+        self.loaded_from_file = False
 
+    def compute_region_utm(self):
+        """
+        compute the region covered by this partitionset by joining all geometries in 
+        the corresponding geopandas dataframe
+        """
 
-        print ("saving tmp data")
-        self.data.to_file("/opt/partition_data.geojson", driver="GeoJSON")
-        if region is None:
+        if self.region_utm is not None:
+            return self.region_utm
+        
+        if self.region is None:
             self.region = utils.get_boundary(self.data)
                         
         # corresponding UTM CRS in meters to this location
@@ -61,8 +70,6 @@ class PartitionSet:
 
         # the region in UTM CRS meters
         self.region_utm = gpd.GeoDataFrame({'geometry': [self.region]}, crs = self.epsg4326).to_crs(self.utm_crs).geometry[0]
-            
-        self.loaded_from_file = False
 
     def reset_data(self):
         self.data = None
@@ -76,6 +83,8 @@ class PartitionSet:
         """
         assert self.data is None, "cannot make partitions over existing data"
         
+        self.compute_region_utm()
+
         # cut off region, assuming region_utm is expressed in meters
         parts = katana(self.region_utm, threshold=max_rectangle_size, random_variance=random_variance)
 
@@ -109,6 +118,7 @@ class PartitionSet:
 
         """
         assert self.data is None, "cannot make partitions over existing data"
+        self.compute_region_utm()
 
         coords = np.r_[self.region_utm.envelope.boundary.coords]        
         m = rectangle_size
@@ -162,7 +172,7 @@ class PartitionSet:
         """
 
         dest_dir = self.get_downloaded_tiles_dest_dir(gee_image_name)
-        print ("saving tiles to", dest_dir)
+        print ("saving tiles to", dest_dir, flush=True)
          
         gee.download_tiles( self.data,
                             dest_dir,
@@ -390,6 +400,8 @@ class PartitionSet:
             r.partitions_name = None
         else:
             r.partitions_name = pname.group(1)
+
+        r.loaded_from_file = True
 
         return r          
 
