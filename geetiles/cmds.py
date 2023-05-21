@@ -154,8 +154,9 @@ n_processes        {n_processes}
     print (f"dataset name is '{dataset_name}'")
     print ("-----------------------------------------------")
     # download the tiles
+    print ("loading chip definitions ... ", flush=True, end="")
     p = partitions.PartitionSet.from_file(tiles_file)
-
+    print ("done", flush=True)
     # save gee_image_codestr
     dest_dir = p.get_downloaded_tiles_dest_dir(dataset_name)
     os.makedirs(dest_dir, exist_ok=True)
