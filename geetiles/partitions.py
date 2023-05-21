@@ -48,7 +48,7 @@ class PartitionSet:
             self.data['identifier'] = [utils.get_region_hash(i) for i in self.data.geometry]
 
         if region is None:
-            self.region = sh.ops.unary_union(self.data.geometry)
+            self.region = utils.get_boundary(self.data)
                         
         # corresponding UTM CRS in meters to this location
         lon, lat = np.r_[self.region.envelope.boundary.coords].mean(axis=0)

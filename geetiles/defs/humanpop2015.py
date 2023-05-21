@@ -23,8 +23,8 @@ class DatasetDefinition:
         return 'uint16'
 
     def include_chip_in_dataset(self, chip_dict):
-        cprops = chip_dict['label_proportions']['partitions_aschip']
-        if '0' in cprops.keys() and cprops['0']==1. and np.random.random()>0.01:
-            return False
+        #cprops = chip_dict['label_proportions']['partitions_aschip']
+        #if '0' in cprops.keys() and cprops['0']==1. and np.random.random()>0.01:
+        #    return False
         
         return True

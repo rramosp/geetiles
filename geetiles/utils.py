@@ -9,9 +9,84 @@ from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info
 from rasterio.features import rasterize
 import shapely as sh
+from alphashape import alphashape
+from progressbar import progressbar as pbar
 
 epsg4326 = CRS.from_epsg(4326)
 
+
+def flatten_geom(geom, r=[]):
+    """
+    flattens multipart geo
+    geom: a shapely geometry. if multipart, recursion will be used, else it will just be returned           
+    r: list of return values for recursion
+    
+    returns: a list of geometries. if geom is not multipart, returns [geom]
+    """
+    
+    if not isinstance(geom, sh.geometry.base.BaseGeometry):
+        raise ValueError("'geom' must be a shapely geometry")
+
+    
+    # if not multipart
+    if not 'geoms' in dir(geom):
+        return [geom]
+        
+    # loop over all geometries
+    for g in geom.geoms:
+        r = r + list(flatten_geom(g))
+
+    return r
+
+
+def concave_hull(geoms, use_pbar=False):
+    """
+    compute the concave hull of a list of geometries using alphashape
+    
+    geoms: a shapely geometry or a list of shapely geometries
+    
+    returns: a shapely geometry with the concave hull
+    """
+    if not hasattr(geoms, '__iter__'):
+        geoms = [geoms]
+
+    if hasattr(geoms, 'geoms'):
+        geoms = geoms.geoms
+        
+    if use_pbar:
+        pb = pbar
+    else:
+        pb = lambda x: x
+    
+    coords = []
+    for g in pb(geoms):
+        for p in flatten_geom(g):
+            for c in p.boundary.coords:
+                coords.append(c)
+    return alphashape(coords, 1.0)
+
+
+def get_boundary(w):
+    """
+    computes the boundary of a geopandas dataframe by splitting it, computing 
+    the concave hulls of each split, and once again the concave hull of these
+    
+    w: a geopandas dataframe
+    
+    returns: a shapely geometry
+    """
+    
+    splits = list(range(0, len(w), 1000))
+    ashapes = []
+    print("computing boundary by splitting", flush=True)
+    for i in pbar(range(len(splits))):
+        a,b = splits[i], splits[i+1] if i<len(splits)-1 else len(w)
+
+        ashapes.append(concave_hull(w[a:b].geometry.values))
+
+    print ("joining splits", flush=True)
+    r = concave_hull(ashapes)
+    return r
 
 def get_dataset_definition(dataset_def):
     # define gee image object
