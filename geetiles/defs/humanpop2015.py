@@ -14,7 +14,7 @@ class DatasetDefinition:
         return populationCount
 
     def get_dataset_name(self):
-        return 'humanpop2015'
+        return 'humanpop-2015'
 
     def map_values(self, array):
         return utils.apply_range_map(array, list(range(1,300,10)))

@@ -1,10 +1,13 @@
 import ee
 from geetiles import utils
 
+# this class is here only for legacy as it got 
+# renamed to esaworldcover2020
+
 class DatasetDefinition:
 
     def get_dataset_name(self):
-        return 'esaworldcover-2020'
+        return 'esa-world-cover'
     
     def get_gee_image(self):
         return ee.ImageCollection("ESA/WorldCover/v100").first()
