@@ -34,7 +34,7 @@ If using `sentinel2-rgb-median-2020` as `dataset_def`, which is an alias to [Sen
 
 <center><img src='imgs/sentinel2.png' width=800></center>
 
-If using `esa-world-cover` as `dataset_def`, which is an alias to [ESA WorldCover 10m v100](https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100) GEE dataset.
+If using `esaworldcover-2020` as `dataset_def`, which is an alias to [ESA WorldCover 10m v100](https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100) GEE dataset.
 
 <center><img src='imgs/landcover.png' width=800></center>
 
