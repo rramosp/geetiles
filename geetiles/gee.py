@@ -197,6 +197,7 @@ class GEETile:
                 'region': rectangle,
                 'dimensions': dims,
                 'format': 'GEO_TIFF',
+                'crs': 'EPSG:4326'
             }
         )
 
