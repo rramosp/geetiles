@@ -66,6 +66,14 @@ def main():
     zip_parser.add_argument('--labels_dataset_def', default=None, required=False, type=str, help="name of the dataset or python file used to download tiles (see 'dataset_def' in 'download').")
     zip_parser.add_argument('--readme_file', default=None, required=False, type=str, help="name of the README.txt file to add to the zip file.")
 
+
+    mosaic_parser = subparsers.add_parser('mosaic', help='make a single image with all tifs in a folder.')
+    mosaic_parser.add_argument('--basedir', required=True, type=str, help='folder with tifs.')
+    mosaic_parser.add_argument('--dest_file', required=True, type=str, help='file where to store the mosaic in GeoTIFF format.')
+    mosaic_parser.add_argument('--meters_per_pixel', required=True, type=int, help='an int, meters per each pixel in the resulting mosaic.')
+    mosaic_parser.add_argument('--channels', default=None, type=str, help='a list of ints with the channels to include in the mosaic. If not set, only channel0 will be used')
+
+
     print ("-----------------------------------------------------------")
     print (f"Google Earth Engine dataset extractor utility {__version__}")
     print ("-----------------------------------------------------------")
@@ -78,6 +86,18 @@ def main():
                   chip_size_meters = args.chip_size_meters, 
                   aoi_name         = args.aoi_name, 
                   dest_dir         = args.dest_dir)
+        
+    elif args.cmd == 'mosaic':
+        print("making mosaic", flush = True)
+        try:
+            channels = eval(args.channels)
+        except Exception as e:
+            raise ValueError("cannot parse channels list, "+str(e))
+        
+        make_mosaic(basedir          = args.basedir,
+                    meters_per_pixel = args.meters_per_pixel,
+                    channels         = channels,
+                    dest_file        = args.dest_file)
 
     elif args.cmd == 'random':
         print ("making random partitions", flush=True)

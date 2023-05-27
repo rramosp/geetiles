@@ -14,7 +14,10 @@ from progressbar import progressbar as pbar
 from skimage.io import imread
 import pickle
 from zipfile import ZipFile, ZIP_DEFLATED
-
+import rasterio
+from skimage.transform import resize
+from rasterio.transform import from_origin
+from scipy.ndimage import rotate
 
 from . import partitions
 from . import utils
@@ -470,3 +473,125 @@ def zip_dataset(tiles_file,
         raise ValueError(f"could not create zip file {zipfile}")
 
     print ("done!")
+
+
+def get_bounds(raster_file):
+    src = rasterio.open(raster_file)
+    w,s,e,n = src.bounds
+    src.close()
+    return np.r_[[w,s,e,n]]
+
+    
+def get_resized_img_with_pixel_coords(raster_file, utm_crs, min_lonlat_meters, meters_per_pixel):
+    """
+    reads an image 
+    """
+    
+    epsg4326 = CRS.from_epsg(4326)
+    
+    # read image
+    with rasterio.open(raster_file) as src:
+        w,s,e,n = src.bounds
+        img = src.read()
+        img = np.transpose(img, [2,1,0])
+
+    # transform dimensions into pixel coords    
+    coords = np.r_[list(gpd.GeoDataFrame([], geometry=[sh.geometry.Polygon([[w,n], [w,s], [e,s], [e,n]])], crs=epsg4326).to_crs(utm_crs).geometry.values[0].boundary.coords)]
+    sw_corner_lonlat_meters = coords[1]
+
+    coords_pixels = np.ceil((coords - min_lonlat_meters) / meters_per_pixel).astype(int)
+    sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int) 
+
+    patch_size = coords_pixels[2,0] - coords_pixels[1,0], coords_pixels[3,1] - coords_pixels[2,1]
+
+    # resize and rotate img 
+    rotate_x = coords_pixels[0,0] - coords_pixels[1,0]
+    rotate_y = coords_pixels[1,1] - coords_pixels[2,1]
+    rotate_x = patch_size[1]
+    angle = np.arctan2(rotate_y, rotate_x)*180/np.pi
+    #print ("\n rotate", rotate_x, rotate_y, angle)
+
+    img_resized = resize(img, patch_size, order=0, preserve_range=True).astype(img.dtype)
+    img_resized = rotate(img_resized, angle)
+    rotated_patch_size = img_resized.shape[:2]
+
+    x0, x1 = sw_lonlat_pixels[0], sw_lonlat_pixels[0] + rotated_patch_size[0]
+    y0, y1 = sw_lonlat_pixels[1] - rotate_y, sw_lonlat_pixels[1] + rotated_patch_size[1] - rotate_y
+
+    return x0,x1, y0,y1, img_resized    
+    
+def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):    
+    """
+    creates a mosaic of all tifs found in a folder. assumes all tiffs use the same numeric 
+    type and all pixels are non-zero (i.e, from rectangular grid)
+
+    basedir:           the folder to look for tiffs (not recursively)
+    meters_per_pixel:  resolution of the resulting mosaic image
+    dest_file:         where to store the resulting mosaic in GeoTIFF format
+    channels:          a list with the channels to include from each tiff into the mosaic
+    """
+
+    if channels is None:
+        channels = [0]
+
+    epsg4326 = CRS.from_epsg(4326)
+
+    fnames = sorted(os.listdir(basedir))
+    
+    print (f"computing resulting mosaic image size for {len(fnames)} files", flush=True) 
+    bounds = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_bounds)(f"{basedir}/{fname}") for fname in fnames)
+    bounds = np.r_[bounds]
+
+    # compute meters utm corresponding to the mean location of all geometries
+    coords      = np.vstack([bounds[:, :2], bounds[:,2:]])
+    
+    mean_lonlat = coords.mean(axis=0)
+    utm_crs     = utils.get_utm_crs(*mean_lonlat)
+    min_lonlat  = coords.min(axis=0)
+    max_lonlat  = coords.max(axis=0)
+    
+    # compute bounding rectangle bounds in meters
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+                                                            crs=epsg4326)\
+                                              .to_crs(utm_crs).geometry.values
+
+    min_lonlat_meters, max_lonlat_meters = np.r_[min_lonlat_meters.coords][0], np.r_[max_lonlat_meters.coords][0]
+    
+    # compute dimensions of resulting image
+    img_dim_x, img_dim_y = np.round((max_lonlat_meters - min_lonlat_meters)  / meters_per_pixel).astype(int)
+    
+    # get type of resulting tiff by opening any file
+    src = rasterio.open(f"{basedir}/{fnames[0]}")
+    r = np.zeros([img_dim_x, img_dim_y, len(channels)], dtype=src.dtypes[0])
+    src.close()
+    
+    print ("\nreading and resizing images", flush=True)
+    imgs_and_coords = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_resized_img_with_pixel_coords)(f"{basedir}/{fname}", utm_crs, min_lonlat_meters, meters_per_pixel) for fname in fnames)
+
+    print ("\nbuilding mosaic", flush=True)
+    for x0,x1,y0,y1,img_resized in imgs_and_coords:
+        if x0>img_dim_x or x1>img_dim_x or y0>img_dim_y or y1>img_dim_y or x0<0 or y0<0 or x1<0 or y1<0:
+            continue
+
+        patch = img_resized[:,::-1,channels]
+        patch = patch[:(x1-x0), :(y1-y0), :]
+        r[x0:x1, y0:y1, :][patch!=0] = patch[:(x1-x0), :(y1-y0), :][patch!=0]
+
+    # transpose x and y, and flip
+    r = np.transpose(r, [1,0,2])
+    r = r[::-1, :, :]
+        
+    left, top = min_lonlat_meters[0], max_lonlat_meters[1]
+    resx, resy = (max_lonlat_meters - min_lonlat_meters) / np.r_[r.shape[:2]] 
+    transform = from_origin(left, top, meters_per_pixel, meters_per_pixel)
+    with rasterio.open(dest_file, 'w', driver='GTiff',
+                    height = r.shape[0], width = r.shape[1],
+                    count=1, dtype=str(r.dtype),
+                    crs=utm_crs, #CRS.from_epsg(4326),
+                    transform=transform) as new_dataset:
+        for i in range(r.shape[-1]):
+            new_dataset.write(r[:,:,i], i+1)
+
+    print ("\nmosaic written to", dest_file)
+    return r

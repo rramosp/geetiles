@@ -4,7 +4,7 @@ from geetiles import utils
 class DatasetDefinition:
 
     def get_dataset_name(self):
-        return 'esaworldcover-2020'
+        return 'esa-world-cover'
     
     def get_gee_image(self):
         return ee.ImageCollection("ESA/WorldCover/v100").first()
