@@ -74,6 +74,10 @@ def main():
     mosaic_parser.add_argument('--channels', default=None, type=str, help='a list of ints with the channels to include in the mosaic. If not set, only channel0 will be used')
 
 
+    cleanup_parser = subparsers.add_parser('cleanup', help='cleans up a folder with tifs, removing the ones unreadable.')
+    cleanup_parser.add_argument('--basedir', required=True, type=str, help='folder with tifs.')
+
+
     print ("-----------------------------------------------------------")
     print (f"Google Earth Engine dataset extractor utility {__version__}")
     print ("-----------------------------------------------------------")
@@ -98,6 +102,10 @@ def main():
                     meters_per_pixel = args.meters_per_pixel,
                     channels         = channels,
                     dest_file        = args.dest_file)
+        
+    elif args.cmd == 'cleanup':
+        print ("cleaning up tifs", flush=True)
+        cleanup(basedir = args.basedir)
 
     elif args.cmd == 'random':
         print ("making random partitions", flush=True)

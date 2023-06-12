@@ -490,36 +490,41 @@ def get_resized_img_with_pixel_coords(raster_file, utm_crs, min_lonlat_meters, m
     epsg4326 = CRS.from_epsg(4326)
     
     # read image
-    with rasterio.open(raster_file) as src:
-        w,s,e,n = src.bounds
-        img = src.read()
-        img = np.transpose(img, [2,1,0])
 
-    # transform dimensions into pixel coords    
-    coords = np.r_[list(gpd.GeoDataFrame([], geometry=[sh.geometry.Polygon([[w,n], [w,s], [e,s], [e,n]])], crs=epsg4326).to_crs(utm_crs).geometry.values[0].boundary.coords)]
-    sw_corner_lonlat_meters = coords[1]
+    try:
+        with rasterio.open(raster_file) as src:
+            w,s,e,n = src.bounds
+            img = src.read()
+            img = np.transpose(img, [2,1,0])
+            
+        # transform dimensions into pixel coords    
+        coords = np.r_[list(gpd.GeoDataFrame([], geometry=[sh.geometry.Polygon([[w,n], [w,s], [e,s], [e,n]])], crs=epsg4326).to_crs(utm_crs).geometry.values[0].boundary.coords)]
+        sw_corner_lonlat_meters = coords[1]
 
-    coords_pixels = np.ceil((coords - min_lonlat_meters) / meters_per_pixel).astype(int)
-    sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int) 
+        coords_pixels = np.ceil((coords - min_lonlat_meters) / meters_per_pixel).astype(int)
+        sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int) 
 
-    patch_size = coords_pixels[2,0] - coords_pixels[1,0], coords_pixels[3,1] - coords_pixels[2,1]
+        patch_size = coords_pixels[2,0] - coords_pixels[1,0], coords_pixels[3,1] - coords_pixels[2,1]
 
-    # resize and rotate img 
-    rotate_x = coords_pixels[0,0] - coords_pixels[1,0]
-    rotate_y = coords_pixels[1,1] - coords_pixels[2,1]
-    rotate_x = patch_size[1]
-    angle = np.arctan2(rotate_y, rotate_x)*180/np.pi
-    #print ("\n rotate", rotate_x, rotate_y, angle)
+        # resize and rotate img 
+        rotate_x = coords_pixels[0,0] - coords_pixels[1,0]
+        rotate_y = coords_pixels[1,1] - coords_pixels[2,1]
+        rotate_x = patch_size[1]
+        angle = np.arctan2(rotate_y, rotate_x)*180/np.pi
+        #print ("\n rotate", rotate_x, rotate_y, angle)
 
-    img_resized = resize(img, patch_size, order=0, preserve_range=True).astype(img.dtype)
-    img_resized = rotate(img_resized, angle)
-    rotated_patch_size = img_resized.shape[:2]
+        img_resized = resize(img, patch_size, order=0, preserve_range=True).astype(img.dtype)
+        img_resized = rotate(img_resized, angle)
+        rotated_patch_size = img_resized.shape[:2]
 
-    x0, x1 = sw_lonlat_pixels[0], sw_lonlat_pixels[0] + rotated_patch_size[0]
-    y0, y1 = sw_lonlat_pixels[1] - rotate_y, sw_lonlat_pixels[1] + rotated_patch_size[1] - rotate_y
+        x0, x1 = sw_lonlat_pixels[0], sw_lonlat_pixels[0] + rotated_patch_size[0]
+        y0, y1 = sw_lonlat_pixels[1] - rotate_y, sw_lonlat_pixels[1] + rotated_patch_size[1] - rotate_y
+
+    except:
+        x0,x1,y0,y1,img_resized = [None]*5
 
     return x0,x1, y0,y1, img_resized    
-    
+
 def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):    
     """
     creates a mosaic of all tifs found in a folder. assumes all tiffs use the same numeric 
@@ -571,7 +576,7 @@ def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):
 
     print ("\nbuilding mosaic", flush=True)
     for x0,x1,y0,y1,img_resized in imgs_and_coords:
-        if x0>img_dim_x or x1>img_dim_x or y0>img_dim_y or y1>img_dim_y or x0<0 or y0<0 or x1<0 or y1<0:
+        if img_resized is None or x0>img_dim_x or x1>img_dim_x or y0>img_dim_y or y1>img_dim_y or x0<0 or y0<0 or x1<0 or y1<0:
             continue
 
         patch = img_resized[:,::-1,channels]
@@ -587,7 +592,7 @@ def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):
     transform = from_origin(left, top, meters_per_pixel, meters_per_pixel)
     with rasterio.open(dest_file, 'w', driver='GTiff',
                     height = r.shape[0], width = r.shape[1],
-                    count=1, dtype=str(r.dtype),
+                    count=r.shape[-1], dtype=str(r.dtype),
                     crs=utm_crs, #CRS.from_epsg(4326),
                     transform=transform) as new_dataset:
         for i in range(r.shape[-1]):
@@ -595,3 +600,43 @@ def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):
 
     print ("\nmosaic written to", dest_file)
     return r
+
+
+def cleanup(basedir):
+    """
+    cleans up a folder with tifs, removing the ones unreadable
+
+    basedir: the folder to cleanup
+
+    """
+    def checkfile(filepath):
+        try:
+            with rasterio.open(filepath) as src:
+                b = src.bounds
+                r =f"{src.height}x{src.width}x{src.count}"
+        except Exception as e:
+            r = f"ERROR::{filepath}::{str(e)}"
+
+        return r
+
+    # get all tif files
+    files = [i for i in os.listdir(basedir) if i.endswith(".tif")]
+
+    # try to open each file
+    r = utils.mParallel(verbose=30, n_jobs=-1)(delayed(checkfile)( f"{basedir}/{file}") for file in files)
+
+    # remove the files that could not be open
+    errors = [i for i in r if i.startswith("ERROR") ]
+    if len(errors)>0:
+        print (f"\nremoving {len(errors)} files", flush=True)
+
+        removed = []
+        for i in pbar(errors):
+            filepath = i.split("::")[1]
+            if os.path.isfile(filepath):
+                os.remove(filepath)
+                removed.append(filepath)
+
+        print (f"\nremoved {len(removed)} files", flush=True)
+    else:
+        print ("\nno files to remove")

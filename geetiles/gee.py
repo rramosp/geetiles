@@ -201,6 +201,8 @@ class GEETile:
             }
         )
 
+        band_names = self.image_collection.bandNames().getInfo()
+    
         # download and save to tiff
         r = requests.get(url, stream=True)
 
@@ -210,7 +212,7 @@ class GEETile:
         with open(filename, 'wb') as outfile:
             shutil.copyfileobj(r.raw, outfile)
 
-        # reopen tiff to mask out region and set image type
+        # reopen tiff to mask out region, set image type and band names
         with rasterio.open(filename) as src:
             out_image, out_transform = rasterio.mask.mask(src, [self.region], crop=True)
             out_meta = src.meta
@@ -226,6 +228,10 @@ class GEETile:
 
         with rasterio.open(filename, "w", **out_meta) as dest:
             dest.write(out_image)  
+            for i in range(out_image.shape[0]):
+                if self.dtype is not None:
+                    dest.write_band(i+1, out_image[i].astype(self.dtype)  )
+                dest.set_band_description(i+1, band_names[i])
 
         # open raster again to adjust and check saturation and invalid pixels
         with rasterio.open(filename) as src:
@@ -248,3 +254,4 @@ class GEETile:
             with rasterio.open(filename, 'w', **profile) as dest:
                 for i in range(src.count):
                     dest.write(x[:,:,i], i+1)      
+                    dest.set_band_description(i+1, band_names[i])
