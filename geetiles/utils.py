@@ -91,30 +91,35 @@ def get_boundary(w):
 def get_dataset_definition(dataset_def):
     # define gee image object
     try:
-        cmd = f"from .defs.{dataset_def.replace('-', '')} import DatasetDefinition"
-        exec(cmd, globals())
-        dataset_definition = DatasetDefinition()
+        try:
+            cmd = f"from .defs.{dataset_def.replace('-', '')} import DatasetDefinition"
+            exec(cmd, globals())
+        except Exception as e:
+            cmd = f"from .defs.{''.join(dataset_def.split('-')[:-1])} import DatasetDefinition"
+            exec(cmd, globals())
+
+        dataset_definition = DatasetDefinition(dataset_def)
         pyfname = dataset_def
-    except:        
+    except Exception as e:
         if os.path.isfile(dataset_def):
             pyfname = dataset_def
         elif os.path.isfile(dataset_def+".py"):
             pyfname = dataset_def+".py"
         else:
-            raise ValueError(f"file {dataset_def} not found")
+            raise ValueError(f"dataset {dataset_def} not found")
 
         print (f"evaluating python code at {pyfname}")
         dataset_def = open(pyfname).read()
         try:
             exec(dataset_def, globals())
-            dataset_definition = DatasetDefinition()
+            dataset_definition = DatasetDefinition(dataset_def)
         except Exception as e:
             print ("--------------------------------------")
             print (f"error executing your code at {pyfname}")
             print ("--------------------------------------")
             raise e
 
-    return DatasetDefinition()
+    return dataset_definition
 
 class mParallel(Parallel):
     """
