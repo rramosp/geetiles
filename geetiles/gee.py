@@ -78,10 +78,7 @@ def download_tiles(
                             f"when downloading gee tiles, but found \n{data.crs}")
     
     global _gee_get_tile_progress_period
-    
-    if not skip_if_exists and os.path.exists(dest_dir):
-        raise ValueError(f"destination folder {dest_dir} already exists")
-    
+        
     os.makedirs(dest_dir, exist_ok=True)
 
     gtiles = []

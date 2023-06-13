@@ -2,10 +2,14 @@ import ee
 
 class DatasetDefinition:
 
+    def __init__(self, dataset_def):
+        self.dataset_def = dataset_def
+
     def get_dataset_name(self):
-        return 'sentinel2-rgb-median-2020'
+        return self.dataset_def
     
     def get_gee_image(self):
+    
         def maskS2clouds(image):
             qa = image.select('QA60')
 

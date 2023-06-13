@@ -3,6 +3,13 @@ from geetiles import utils
 
 class DatasetDefinition:
 
+    def __init__(self, dataset_def):
+        self.dataset_def = dataset_def
+
+    def get_dataset_name(self):
+        return self.dataset_def
+
+
     def get_gee_image(self):
         gee_image = ee.ImageCollection('MODIS/006/MOD44B')\
                     .filterDate('2020-01-01', '2020-12-31')\
@@ -11,9 +18,6 @@ class DatasetDefinition:
                     .visualize(min=0, max=100)        
         
         return gee_image
-
-    def get_dataset_name(self):
-        return 'treecover2020'
 
     def map_values(self, array):
         # discretize percentage of tree cover

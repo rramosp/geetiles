@@ -6,8 +6,11 @@ from geetiles import utils
 
 class DatasetDefinition:
 
+    def __init__(self, dataset_def):
+        self.dataset_def = dataset_def
+
     def get_dataset_name(self):
-        return 'modis44b006veg'
+        return self.dataset_def
     
     def get_gee_image(self):
         modis = None
