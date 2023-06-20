@@ -46,7 +46,7 @@ class DatasetDefinition:
 
             vhasc = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'ASCENDING'))\
-                        .select(['VV'])\
+                        .select(['VH'])\
                         .mean()\
                         .rename(f'{season}_vhasc')
 
