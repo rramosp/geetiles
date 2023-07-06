@@ -150,12 +150,16 @@ n_processes        {n_processes}
 
     ee.Initialize()
 
-    gee_image = dataset_definition.get_gee_image()
     dataset_name = dataset_definition.get_dataset_name()
 
     print ("-----------------------------------------------")
     print (f"dataset name is '{dataset_name}'")
     print ("-----------------------------------------------")
+
+    # give a chance for dataset_definition to bootstrap stuff
+    if 'build' in dir(dataset_definition):
+        dataset_definition.build()
+
     # download the tiles
     print ("loading chip definitions ... ", flush=True, end="")
     p = partitions.PartitionSet.from_file(tiles_file)
@@ -166,13 +170,13 @@ n_processes        {n_processes}
     with open(f"{dest_dir}.dataset_def.py", "w") as f:
         f.write(dataset_def)
 
-    p.download_gee_tiles(gee_image, dataset_name, 
+    p.download_gee_tiles(dataset_definition = dataset_definition, 
                          meters_per_pixel = meters_per_pixel, 
                          pixels_lonlat = pixels_lonlat,
                          dtype = dtype, 
                          shuffle = shuffle,
                          skip_if_exists = skip_if_exists,
-                         enhance_images = None,
+                         n_processes = n_processes,
                          max_downloads=max_downloads)
     
     print("\ndone.")
