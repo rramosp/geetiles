@@ -17,7 +17,7 @@ class DatasetDefinition:
     def get_dataset_name(self):
         return self.dataset_def
     
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
         if self.year == '2020':
             return ee.ImageCollection("ESA/WorldCover/v100").first()
         elif self.year == '2021':

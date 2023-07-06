@@ -88,31 +88,31 @@ def get_boundary(w):
     r = concave_hull(ashapes)
     return r
 
-def get_dataset_definition(dataset_def):
+def get_dataset_definition(dataset_name):
     # define gee image object
     try:
         try:
-            cmd = f"from .defs.{dataset_def.replace('-', '')} import DatasetDefinition"
+            cmd = f"from .defs.{dataset_name.replace('-', '')} import DatasetDefinition"
             exec(cmd, globals())
         except Exception as e:
-            cmd = f"from .defs.{''.join(dataset_def.split('-')[:-1])} import DatasetDefinition"
+            cmd = f"from .defs.{dataset_name.split('-')[0]} import DatasetDefinition"
             exec(cmd, globals())
 
-        dataset_definition = DatasetDefinition(dataset_def)
-        pyfname = dataset_def
+        dataset_definition = DatasetDefinition(dataset_name)
+        pyfname = dataset_name
     except Exception as e:
-        if os.path.isfile(dataset_def):
-            pyfname = dataset_def
-        elif os.path.isfile(dataset_def+".py"):
-            pyfname = dataset_def+".py"
+        if os.path.isfile(dataset_name):
+            pyfname = dataset_name
+        elif os.path.isfile(dataset_name+".py"):
+            pyfname = dataset_name+".py"
         else:
-            raise ValueError(f"dataset {dataset_def} not found")
+            raise ValueError(f"dataset {dataset_name} not found. {str(e)}")
 
         print (f"evaluating python code at {pyfname}")
-        dataset_def = open(pyfname).read()
+        dataset_name = open(pyfname).read()
         try:
-            exec(dataset_def, globals())
-            dataset_definition = DatasetDefinition(dataset_def)
+            exec(dataset_name, globals())
+            dataset_definition = DatasetDefinition(dataset_name)
         except Exception as e:
             print ("--------------------------------------")
             print (f"error executing your code at {pyfname}")

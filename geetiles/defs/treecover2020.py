@@ -10,7 +10,7 @@ class DatasetDefinition:
         return self.dataset_def
 
 
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
         gee_image = ee.ImageCollection('MODIS/006/MOD44B')\
                     .filterDate('2020-01-01', '2020-12-31')\
                     .first()\

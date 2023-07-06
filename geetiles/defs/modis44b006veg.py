@@ -12,7 +12,7 @@ class DatasetDefinition:
     def get_dataset_name(self):
         return self.dataset_def
     
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
         modis = None
         for year in ['2016', '2017', '2018', '2019', '2020']:
             modisyear = ee.ImageCollection('MODIS/006/MOD44B') \

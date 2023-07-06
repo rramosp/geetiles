@@ -153,13 +153,11 @@ class PartitionSet:
         return dest_dir
         
     def download_gee_tiles(self,
-                        gee_image, 
-                        gee_image_name, 
+                        dataset_definition,
                         n_processes=10, 
                         pixels_lonlat=None, 
                         meters_per_pixel=None,
                         remove_saturated_or_null = False,
-                        enhance_images = None,
                         max_downloads=None, 
                         shuffle=True,
                         skip_if_exists = False,
@@ -168,20 +166,18 @@ class PartitionSet:
         """
         see gee.download_tiles
         it will use the same folder in which the partitions where saved to or loaded from as geojson.
-        gee_image_name: a name to create a subfolder for this partitions.
         """
 
-        dest_dir = self.get_downloaded_tiles_dest_dir(gee_image_name)
+        dest_dir = self.get_downloaded_tiles_dest_dir(dataset_definition.get_dataset_name())
         print ("saving tiles to", dest_dir, flush=True)
          
         gee.download_tiles( self.data,
                             dest_dir,
-                            gee_image = gee_image, 
+                            dataset_definition = dataset_definition,
                             n_processes = n_processes, 
                             pixels_lonlat = pixels_lonlat, 
                             meters_per_pixel = meters_per_pixel,
                             remove_saturated_or_null = remove_saturated_or_null,
-                            enhance_images = enhance_images,
                             max_downloads = max_downloads, 
                             shuffle = shuffle,
                             skip_if_exists = skip_if_exists,

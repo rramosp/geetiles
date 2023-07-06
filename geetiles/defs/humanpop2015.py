@@ -4,7 +4,7 @@ import numpy as np
 
 class DatasetDefinition:
 
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
         dataset = ee.ImageCollection('JRC/GHSL/P2016/POP_GPW_GLOBE_V1')\
                     .filter(ee.Filter.date('2015-01-01', '2015-12-31'))
 

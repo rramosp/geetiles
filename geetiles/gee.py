@@ -5,7 +5,6 @@ import shutil
 import os
 import ee
 from retry import retry
-from skimage import exposure
 import rasterio.mask
 import multiprocessing
 import numpy as np
@@ -29,26 +28,24 @@ def _get_tile(i,gee_tile):
         print (f"{i} ", end="", flush=True)
 
 def get_gee_tiles(self, 
-                    image_collection, 
+                    dataset_definition, 
                     dest_dir=".", 
                     file_prefix="geetile_", 
                     pixels_lonlat=None, 
                     meters_per_pixel=None,
                     remove_saturated_or_null = False,
-                    enhance_images = None,
                     dtype = None,
                     skip_if_exists = False):
     r = []
     for g,i in zip(self.data.geometry.values, self.data.identifier.values):
-        r.append(GEETile(image_collection=image_collection,
-                        region = g,
+        r.append(GEETile(dataset_definition=dataset_definition,
+                        tile_geometry = g,
                         identifier = i,
                         dest_dir = dest_dir, 
                         file_prefix = file_prefix,
                         pixels_lonlat = pixels_lonlat,
                         meters_per_pixel = meters_per_pixel,
                         remove_saturated_or_null = remove_saturated_or_null,
-                        enhance_images = enhance_images,
                         dtype = dtype,
                         skip_if_exists = skip_if_exists)
                 )
@@ -58,12 +55,11 @@ def get_gee_tiles(self,
 def download_tiles(
                     data,
                     dest_dir,
-                    gee_image, 
+                    dataset_definition, 
                     n_processes=10, 
                     pixels_lonlat=None, 
                     meters_per_pixel=None,
                     remove_saturated_or_null = False,
-                    enhance_images = None,
                     max_downloads=None, 
                     shuffle=True,
                     skip_if_exists = False,
@@ -81,17 +77,19 @@ def download_tiles(
         
     os.makedirs(dest_dir, exist_ok=True)
 
+    if dtype is None:
+        dtype = dataset_definition.get_dtype()
+
     gtiles = []
     for g,i in zip(data.geometry.values, data.identifier.values):
-        gtiles.append(GEETile(image_collection=gee_image,
-                        region = g,
+        gtiles.append(GEETile(dataset_definition=dataset_definition,
+                        tile_geometry = g,
                         identifier = i,
                         dest_dir = dest_dir, 
                         file_prefix = "",
                         pixels_lonlat = pixels_lonlat,
                         meters_per_pixel = meters_per_pixel,
                         remove_saturated_or_null = remove_saturated_or_null,
-                        enhance_images = enhance_images,
                         dtype = dtype,
                         skip_if_exists = skip_if_exists)
                 )
@@ -101,7 +99,7 @@ def download_tiles(
     if max_downloads is not None:
         gtiles = gtiles[:max_downloads]
 
-    print (f"downloading {len(gtiles)} tiles. showing progress of parallel downloading.", flush=True)                                    
+    print (f"downloading {len(gtiles)} tiles. showing progress of {n_processes} parallel download jobs.", flush=True)                                    
     _gee_get_tile_progress_period = np.max([len(gtiles)//100,1])
     pool = multiprocessing.Pool(n_processes)
     pool.starmap(_get_tile, enumerate(gtiles))
@@ -110,53 +108,46 @@ def download_tiles(
 class GEETile:
     
     def __init__(self, 
-                 region, 
-                 image_collection, 
+                 tile_geometry, 
+                 dataset_definition,
                  dest_dir=".", 
                  file_prefix="geetile_", 
                  meters_per_pixel=None, 
                  pixels_lonlat=None, 
                  identifier=None,
                  remove_saturated_or_null = False,
-                 enhance_images = None,
                  dtype = None,
                  skip_if_exists = True):
         """
-        region: shapely geometry in epsg 4326 lon/lat
+        tile_geometry: shapely geometry in epsg 4326 lon/lat
         dest_dir: folder to store downloaded tile from GEE
         file_prefix: to name the tif file with the downloaded tile
         meters_per_pixel: an int, if set, the tile pixel size will be computed to match the requested meters per pixel
         pixels_lonlat: a tuple, if set, the tile will have this exact size in pixels, regardless the physical size.
-        image_collection: an instance of ee.ImageCollection
+        dataset_definition: a DatasetDefinition class
         remove_saturated_or_null: if true, will remove image if saturated or null > 1%
-        enhance_images: operation to enhance images
         """
-        if not enhance_images in [None, 'none', 'gamma']:
-            raise ValueError(f"'enhace_images' value '{enhance_images}' not allowed")
 
         if sum([(meters_per_pixel is None), (pixels_lonlat is None)])!=1: 
             raise ValueError("must specify exactly one of meters_per_pixel or pixels_lonlat")
             
-        self.region = region
+        self.tile_geometry = tile_geometry
         self.meters_per_pixel = meters_per_pixel
-        self.image_collection = image_collection
+        self.dataset_definition = dataset_definition
         self.dest_dir = dest_dir
         self.file_prefix = file_prefix
         self.remove_saturated_or_null = remove_saturated_or_null
-        self.enhance_images = enhance_images
         self.dtype = dtype
         self.skip_if_exists = skip_if_exists
 
 
         if identifier is None:
-            self.identifier = utils.get_region_hash(self.region)
+            self.identifier = utils.get_region_hash(self.tile_geometry)
         else:
             self.identifier = identifier
                     
         if pixels_lonlat is not None:
             self.pixels_lon, self.pixels_lat = pixels_lonlat
-
-
 
     @retry(tries=10, delay=1, backoff=2)
     def get_tile(self):
@@ -170,26 +161,32 @@ class GEETile:
             return
 
 
-        # get appropriate utm crs for this region to measure stuff in meters 
-        lon, lat = list(self.region.envelope.boundary.coords)[0]
+        # get appropriate utm crs for this tile_geometry to measure stuff in meters 
+        lon, lat = list(self.tile_geometry.envelope.boundary.coords)[0]
         utm_crs = utils.get_utm_crs(lon, lat)
-        self.region_utm = gpd.GeoDataFrame({'geometry': [self.region]}, crs = CRS.from_epsg(4326)).to_crs(utm_crs).geometry[0]
+        self.tile_geometry_utm = gpd.GeoDataFrame({'geometry': [self.tile_geometry]}, crs = CRS.from_epsg(4326)).to_crs(utm_crs).geometry[0]
 
         # compute image pixel size if meters per pixels where specified
         if self.meters_per_pixel is not None:
-            coords = np.r_[self.region_utm.envelope.boundary.coords]
+            coords = np.r_[self.tile_geometry_utm.envelope.boundary.coords]
             self.pixels_lon, self.pixels_lat = np.ceil(np.abs(coords[1:] - coords[:-1]).max(axis=0) / self.meters_per_pixel).astype(int)
 
         # build image request
         dims = f"{self.pixels_lon}x{self.pixels_lat}"
 
         try:
-            rectangle = ee.Geometry.Polygon(list(self.region.boundary.coords)) 
+            rectangle = ee.Geometry.Polygon(list(self.tile_geometry.boundary.coords)) 
         except:
             # in case multipolygon, or mutipart or other shapely geometries without a boundary
-            rectangle = ee.Geometry.Polygon(list(self.region.envelope.boundary.coords)) 
+            rectangle = ee.Geometry.Polygon(list(self.tile_geometry.envelope.boundary.coords)) 
 
-        url = self.image_collection.getDownloadURL(
+        image_collection = self.dataset_definition.get_gee_image(tile_geometry = self.tile_geometry)
+
+        # if no image collection do nothing
+        if image_collection is None:
+            return
+
+        url = image_collection.getDownloadURL(
             {
                 'region': rectangle,
                 'dimensions': dims,
@@ -198,7 +195,7 @@ class GEETile:
             }
         )
 
-        band_names = self.image_collection.bandNames().getInfo()
+        band_names = image_collection.bandNames().getInfo()
     
         # download and save to tiff
         r = requests.get(url, stream=True)
@@ -209,9 +206,10 @@ class GEETile:
         with open(filename, 'wb') as outfile:
             shutil.copyfileobj(r.raw, outfile)
 
-        # reopen tiff to mask out region, set image type and band names
+        # reopen tiff to mask out tile_geometry, set image type and band names
+        print ("filename is", filename)
         with rasterio.open(filename) as src:
-            out_image, out_transform = rasterio.mask.mask(src, [self.region], crop=True)
+            out_image, out_transform = rasterio.mask.mask(src, [self.tile_geometry], crop=True)
             out_meta = src.meta
 
         out_meta.update({"driver": "GTiff",
@@ -227,28 +225,11 @@ class GEETile:
             dest.write(out_image)  
             for i in range(out_image.shape[0]):
                 if self.dtype is not None:
-                    dest.write_band(i+1, out_image[i].astype(self.dtype)  )
+                    dest.write_band(i+1, out_image[i]  )
                 dest.set_band_description(i+1, band_names[i])
 
-        # open raster again to adjust and check saturation and invalid pixels
-        with rasterio.open(filename) as src:
-            x = src.read()
-            x = np.transpose(x, [1,2,0])
-            m = src.read_masks()
-            profile = src.profile.copy()
-
-
-        # enhance image
-        if self.enhance_images=='gamma':
-            x = exposure.adjust_gamma(x, gamma=.8, gain=1.2)
-
-        # if more than 1% pixels saturated or invalid then remove this file
-        if self.remove_saturated_or_null and \
-            (np.mean(x>250)>0.01 or np.mean(m==0)>0.01):
-            os.remove(filename)
-        else:
-            # write enhanced image
-            with rasterio.open(filename, 'w', **profile) as dest:
-                for i in range(src.count):
-                    dest.write(x[:,:,i], i+1)      
-                    dest.set_band_description(i+1, band_names[i])
+        try:
+            self.dataset_definition.post_process_tilefile(filename)
+        except AttributeError as e:
+            # if dataset definition does not have the method
+            pass

@@ -3,7 +3,7 @@ from geetiles import utils
 
 class DatasetDefinition:
 
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
         return ee.Image("OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02")
 
     def get_dataset_name(self):

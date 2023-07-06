@@ -1,9 +1,6 @@
 import ee
 from geetiles import utils
 
-# this class is here only for legacy as it got 
-# renamed to esaworldcover2020
-
 class DatasetDefinition:
 
     def __init__(self, dataset_name):
@@ -17,7 +14,7 @@ class DatasetDefinition:
     def get_dataset_name(self):
         return self.dataset_name
     
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
         s1grd = None
         year = self.year
         seasons = {'winter': [f'{int(year)-1:4d}-12-01', f'{year}-02-28'],
