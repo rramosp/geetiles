@@ -207,7 +207,6 @@ class GEETile:
             shutil.copyfileobj(r.raw, outfile)
 
         # reopen tiff to mask out tile_geometry, set image type and band names
-        print ("filename is", filename)
         with rasterio.open(filename) as src:
             out_image, out_transform = rasterio.mask.mask(src, [self.tile_geometry], crop=True)
             out_meta = src.meta
