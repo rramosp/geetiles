@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime
 import shapely as sh
 import json
-
+from pathlib import Path
 class DatasetDefinition:
 
     def __init__(self, dataset_name):
@@ -25,6 +25,15 @@ class DatasetDefinition:
 
     def get_dataset_name(self):
         return self.dataset_name
+    
+
+    def must_get_gee_image(self, filename):
+        """
+        return true if needs to call get_gee_image
+        """
+        if os.path.exists(filename) or os.path.exists(filename+".nodata"):
+            return False
+        return True
 
     def get_floods_metadata(self):
         if not 'floods_metadata' in dir(self.__class__):
@@ -136,5 +145,6 @@ class DatasetDefinition:
 
                 dest.update_tags(**sprops)
         else:
-            # otherwise ok that it was removed
+            # otherwise signal that it is empty
+            Path(filename+".nodata").touch()
             pass
