@@ -157,8 +157,15 @@ class GEETile:
         outdir = os.path.abspath(self.dest_dir)
         filename    = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}"
 
-        if self.skip_if_exists and os.path.exists(filename):
-            return
+        if self.skip_if_exists:
+            if os.path.exists(filename):
+                print ("skipping cos exists", filename)
+                return
+
+            if 'must_get_gee_image' in dir(self.dataset_definition) and\
+               not self.dataset_definition.must_get_gee_image(filename):
+                print ("skipping due to dataset def", filename)
+                return
 
 
         # get appropriate utm crs for this tile_geometry to measure stuff in meters 
