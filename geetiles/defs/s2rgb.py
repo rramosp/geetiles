@@ -46,7 +46,6 @@ class DatasetDefinition:
         return gee_image
     
     def post_process_tilefile(self, filename):
-
         # open raster again to adjust 
         with rasterio.open(filename) as src:
             x = src.read()
@@ -56,13 +55,13 @@ class DatasetDefinition:
             band_names = src.descriptions
 
         x = exposure.adjust_gamma(x, gamma=.8, gain=1.2)
+        x = x.astype(self.get_dtype())
 
         # write enhanced image
         with rasterio.open(filename, 'w', **profile) as dest:
             for i in range(src.count):
                 dest.write(x[:,:,i], i+1)      
                 dest.set_band_description(i+1, band_names[i])
-
     
     def get_dtype(self):
         return 'uint8'

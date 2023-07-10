@@ -149,7 +149,7 @@ class GEETile:
         if pixels_lonlat is not None:
             self.pixels_lon, self.pixels_lat = pixels_lonlat
 
-    @retry(tries=10, delay=1, backoff=2)
+    #@retry(tries=10, delay=1, backoff=2)
     def get_tile(self):
 
         # check if should skip
@@ -159,12 +159,10 @@ class GEETile:
 
         if self.skip_if_exists:
             if os.path.exists(filename):
-                print ("skipping cos exists", filename)
                 return
 
             if 'must_get_gee_image' in dir(self.dataset_definition) and\
                not self.dataset_definition.must_get_gee_image(filename):
-                print ("skipping due to dataset def", filename)
                 return
 
 
@@ -226,6 +224,11 @@ class GEETile:
         if self.dtype is not None:
             out_image = out_image.astype(self.dtype)
             out_meta['dtype'] = self.dtype
+
+        print ("dtype is", out_meta['dtype'])
+
+        if os.path.isfile(filename):
+            os.remove(filename)
 
         with rasterio.open(filename, "w", **out_meta) as dest:
             dest.write(out_image)  
