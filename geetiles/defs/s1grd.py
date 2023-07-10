@@ -34,7 +34,6 @@ class DatasetDefinition:
                         .mean()\
                         .rename(f'{season}_vvasc')
 
-
             vvdes = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))\
                         .select(['VV'])\
@@ -47,13 +46,11 @@ class DatasetDefinition:
                         .mean()\
                         .rename(f'{season}_vhasc')
 
-
             vhdes = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))\
                         .select(['VH'])\
                         .mean()\
                         .rename(f'{season}_vhdes')
-
 
             if s1grd is None:
                 s1grd = vvasc
