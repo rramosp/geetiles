@@ -35,15 +35,34 @@ class DatasetDefinition:
 
             return image.updateMask(mask).divide(10000)
 
-        gee_image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-                        .filterDate('2020-01-01', '2020-12-31')\
-                        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE',20))\
-                        .map(maskS2clouds)\
-                        .select('B4', 'B3', 'B2')\
-                        .median()\
-                        .visualize(min=0, max=0.3)
+        year = self.year
+        seasons = {'winter': [f'{int(year)-1:4d}-12-01', f'{year}-02-28'],
+                'spring': [f'{year}-03-01', f'{year}-05-31'],
+                'summer': [f'{year}-06-01', f'{year}-08-31'],
+                'fall':   [f'{year}-09-01', f'{year}-11-30'],
+                }        
+
+        s2rgb = None
+        for season, dates in seasons.items():
+
+            sentinel1 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+                        .filterDate(dates[0], dates[1])
         
-        return gee_image
+            season = sentinel1\
+                            .filterDate(dates[0],dates[1])\
+                            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE',20))\
+                            .map(maskS2clouds)\
+                            .select('B4', 'B3', 'B2')\
+                            .median()\
+                            .visualize(min=0, max=0.3)\
+                            .rename([f'{season}_{b}' for b in ['red', 'green', 'blue']])
+                            
+            if s2rgb is None:
+                s2rgb = season
+            else:
+                s2rgb = s2rgb.addBands(season)
+
+        return s2rgb
     
     def post_process_tilefile(self, filename):
         # open raster again to adjust 

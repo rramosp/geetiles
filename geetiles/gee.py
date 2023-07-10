@@ -225,8 +225,6 @@ class GEETile:
             out_image = out_image.astype(self.dtype)
             out_meta['dtype'] = self.dtype
 
-        print ("dtype is", out_meta['dtype'])
-
         if os.path.isfile(filename):
             os.remove(filename)
 
