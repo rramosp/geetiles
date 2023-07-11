@@ -6,13 +6,13 @@ from geetiles import utils
 
 class DatasetDefinition:
 
-    def __init__(self, dataset_def):
-        self.dataset_def = dataset_def
+    def __init__(self, dataset_name):
+        self.dataset_def = dataset_name
 
     def get_dataset_name(self):
-        return self.dataset_def
+        return self.dataset_name
     
-    def get_gee_image(self):
+    def get_gee_image(self, **kwargs):
 
         cciburned = None
         year = '2020'
@@ -23,7 +23,7 @@ class DatasetDefinition:
                         .filterDate(f'{year}-01-01', f'{year}-12-31')\
                         .select(['BurnDate', 'ConfidenceLevel', 'LandCover'])\
                         .max()\
-                        .rename([f'BurnDate_{year}', f'ConfidenceLevel_{year}', f'LandCover_{year}'])
+                        .rename([f'{year}_BurnDate', f'{year}_ConfidenceLevel', f'{year}_LandCover'])
 
             
             if cciburned is None:
