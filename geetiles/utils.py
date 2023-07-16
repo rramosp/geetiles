@@ -298,3 +298,7 @@ def apply_range_map(array, range_map):
             r[ (array>=range_map[i]) & (array<range_map[i+1]) ] = i+1
 
     return r
+
+def touch(filename):
+    with open(filename,"w") as f:
+        pass

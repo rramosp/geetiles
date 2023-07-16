@@ -163,6 +163,7 @@ class GEETile:
 
             if 'must_get_gee_image' in dir(self.dataset_definition) and\
                not self.dataset_definition.must_get_gee_image(filename):
+                print ("skipping", filename)
                 return
 
 
