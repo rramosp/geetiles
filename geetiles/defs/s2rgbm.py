@@ -9,7 +9,7 @@ class DatasetDefinition:
     def __init__(self, dataset_name):
         dataset_name_components = dataset_name.split("-")
         if len(dataset_name_components)!=2:
-            raise ValueError("incorrect dataset name. must be 's2rgb-2020' or the year you want")
+            raise ValueError("incorrect dataset name. must be 's2rgbm-2020' or the year you want")
         
         self.year = dataset_name_components[1]
         self.dataset_name = dataset_name
@@ -36,52 +36,42 @@ class DatasetDefinition:
             return image.updateMask(mask).divide(10000)
 
         year = self.year
-        seasons = {'winter': [f'{int(year)-1:4d}-12-01', f'{year}-02-28'],
-                'spring': [f'{year}-03-01', f'{year}-05-31'],
-                'summer': [f'{year}-06-01', f'{year}-08-31'],
-                'fall':   [f'{year}-09-01', f'{year}-11-30'],
-                }        
-
+        months = {
+                '01': [f'{year}-01-01', f'{year}-01-31'],
+                '02': [f'{year}-02-01', f'{year}-02-28'],
+                '03': [f'{year}-03-01', f'{year}-03-31'],
+                '04': [f'{year}-04-01', f'{year}-04-30'],
+                '05': [f'{year}-05-01', f'{year}-05-31'],
+                '06': [f'{year}-06-01', f'{year}-06-30'],
+                '07': [f'{year}-07-01', f'{year}-07-31'],
+                '08': [f'{year}-08-01', f'{year}-08-31'],
+                '09': [f'{year}-09-01', f'{year}-09-30'],
+                '10': [f'{year}-10-01', f'{year}-10-31'],
+                '11': [f'{year}-11-01', f'{year}-11-30'],
+                '12': [f'{year}-12-01', f'{year}-12-31'],
+                }
+        
         s2rgb = None
-        for season, dates in seasons.items():
+        for month, dates in months.items():
 
             sentinel1 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
                         .filterDate(dates[0], dates[1])
         
-            season = sentinel1\
+            t = sentinel1\
                             .filterDate(dates[0],dates[1])\
                             .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE',20))\
                             .map(maskS2clouds)\
                             .select('B4', 'B3', 'B2')\
                             .median()\
                             .visualize(min=0, max=0.3)\
-                            .rename([f'{season}_{b}' for b in ['red', 'green', 'blue']])
+                            .rename([f'{month}_{b}' for b in ['red', 'green', 'blue']])
                             
             if s2rgb is None:
-                s2rgb = season
+                s2rgb = t
             else:
-                s2rgb = s2rgb.addBands(season)
+                s2rgb = s2rgb.addBands(t)
 
         return s2rgb
-    
-    def post_process_tilefile(self, filename):
-        # open raster again to adjust 
-        with rasterio.open(filename) as src:
-            x = src.read()
-            x = np.transpose(x, [1,2,0])
-            m = src.read_masks()
-            profile = src.profile.copy()
-            band_names = src.descriptions
-
-        x = exposure.adjust_gamma(x, gamma=.8, gain=1.2)
-        x = x.astype(self.get_dtype())
-
-        # write enhanced image
-        with rasterio.open(filename, 'w', **profile) as dest:
-            for i in range(src.count):
-                dest.write(x[:,:,i], i+1)      
-                dest.write_mask(m) 
-                dest.set_band_description(i+1, band_names[i])
-    
+        
     def get_dtype(self):
         return 'uint8'

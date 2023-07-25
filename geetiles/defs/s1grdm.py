@@ -12,8 +12,8 @@ class DatasetDefinition:
         self.direction = dataset_name.split("-")[-1]
         self.dataset_name = dataset_name
 
-        if not self.direction in ['asc', 'desc']:
-            raise ValueError(f"invalid direction '{self.direction}', must be 'asc' or 'dec'")
+        if not self.direction in ['asc', 'des']:
+            raise ValueError(f"invalid direction '{self.direction}', must be 'asc' or 'des'")
 
         try:
             year = int(self.year)
