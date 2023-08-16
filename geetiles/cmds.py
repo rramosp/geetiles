@@ -644,3 +644,126 @@ def cleanup(basedir):
         print (f"\nremoved {len(removed)} files", flush=True)
     else:
         print ("\nno files to remove")
+
+
+
+def get_pixels_with_coords(bounds, fill_value, utm_crs, min_lonlat_meters, meters_per_pixel, dtype):
+    """
+    bounds: a tuple with (w,s,e,n) 
+    
+    """
+    epsg4326 = CRS.from_epsg(4326)
+    w,s,e,n  = bounds
+
+    coords = np.r_[list(gpd.GeoDataFrame([], geometry=[sh.geometry.Polygon([[w,n], [w,s], [e,s], [e,n]])], crs=epsg4326).to_crs(utm_crs).geometry.values[0].boundary.coords)]
+    sw_corner_lonlat_meters = coords[1] 
+
+    coords_pixels = np.ceil((coords - min_lonlat_meters) / meters_per_pixel).astype(int)
+
+    w = 1
+    coords_pixels[0] += np.r_[[-w,+w]]
+    coords_pixels[1] += np.r_[[-w,-w]]
+    coords_pixels[2] += np.r_[[+w,-w]]
+    coords_pixels[3] += np.r_[[+w,+w]]
+
+    sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int) 
+
+    patch_size = coords_pixels[2,0] - coords_pixels[1,0], coords_pixels[3,1] - coords_pixels[2,1]
+
+    # resize and rotate img 
+    rotate_x = coords_pixels[0,0] - coords_pixels[1,0]
+    rotate_y = coords_pixels[1,1] - coords_pixels[2,1]
+    rotate_x = patch_size[1]
+    angle = np.arctan2(rotate_y, rotate_x)*180/np.pi
+    img_resized = np.ones(list(patch_size)+[1]).astype(dtype) * fill_value
+    img_resized = rotate(img_resized, angle)
+    rotated_patch_size = img_resized.shape[:2]
+
+    x0, x1 = sw_lonlat_pixels[0], sw_lonlat_pixels[0] + rotated_patch_size[0]
+    y0, y1 = sw_lonlat_pixels[1] - rotate_y, sw_lonlat_pixels[1] + rotated_patch_size[1] - rotate_y 
+
+    return x0,x1, y0,y1, img_resized    
+
+
+def make_mosaic_for_tilevalues(tiles_file, meters_per_pixel, dest_file, dtype=np.float32):
+
+    print (f"reading tiles file from {tiles_file}")
+    zc = gpd.read_file(tiles_file)
+    
+    epsg4326 = CRS.from_epsg(4326)
+
+    # compute bounding coordinates
+    bounds = np.r_[[t.bounds for t in zc.geometry.values]]
+    coords      = np.vstack([bounds[:, :2], bounds[:,2:]])
+
+    mean_lonlat = coords.mean(axis=0)
+    utm_crs     = utils.get_utm_crs(*mean_lonlat)
+    min_lonlat  = coords.min(axis=0)
+    max_lonlat  = coords.max(axis=0)
+
+    # compute bounding rectangle bounds in meters
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+                                                            crs=epsg4326)\
+                                              .to_crs(utm_crs).geometry.values
+
+    min_lonlat_meters, max_lonlat_meters = np.r_[min_lonlat_meters.coords][0], np.r_[max_lonlat_meters.coords][0]
+
+    # compute dimensions of resulting image
+    img_dim_x, img_dim_y = np.round((max_lonlat_meters - min_lonlat_meters)  / meters_per_pixel).astype(int)
+
+    
+    # compute bounding rectangle bounds in meters
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+                                                            crs=epsg4326)\
+                                              .to_crs(utm_crs).geometry.values
+
+    min_lonlat_meters, max_lonlat_meters = np.r_[min_lonlat_meters.coords][0], np.r_[max_lonlat_meters.coords][0]
+
+    # compute dimensions of resulting image
+    img_dim_x, img_dim_y = np.round((max_lonlat_meters - min_lonlat_meters)  / meters_per_pixel).astype(int)
+
+
+    print ("\nplacing values in mosaic", flush=True)
+    imgs_and_coords = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_pixels_with_coords)(t.geometry.bounds, t.value, utm_crs, min_lonlat_meters, meters_per_pixel, dtype) for _,t in zc.iterrows())
+
+    # compute bounding rectangle bounds in meters
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+                                                            crs=epsg4326)\
+                                              .to_crs(utm_crs).geometry.values
+
+    min_lonlat_meters, max_lonlat_meters = np.r_[min_lonlat_meters.coords][0], np.r_[max_lonlat_meters.coords][0]
+
+    # compute dimensions of resulting image
+    img_dim_x, img_dim_y = np.round((max_lonlat_meters - min_lonlat_meters)  / meters_per_pixel).astype(int)
+
+    print ("\n\nbuilding mosaic", flush=True)
+    r = np.zeros([img_dim_x, img_dim_y, 1], dtype=dtype)
+
+    for x0,x1,y0,y1,img_resized in imgs_and_coords:
+        if img_resized is None or x0>img_dim_x or x1>img_dim_x or y0>img_dim_y or y1>img_dim_y or x0<0 or y0<0 or x1<0 or y1<0:
+            continue
+
+        patch = img_resized[:,::-1,:]
+        patch = patch[:(x1-x0), :(y1-y0), :]
+        r[x0:x1, y0:y1, :][patch!=0] = patch[:(x1-x0), :(y1-y0), :][patch!=0]
+
+    # transpose x and y, and flip
+    r = np.transpose(r, [1,0,2])
+    r = r[::-1, :, :]
+    
+    left, top = min_lonlat_meters[0], max_lonlat_meters[1]
+    resx, resy = (max_lonlat_meters - min_lonlat_meters) / np.r_[r.shape[:2]] 
+    transform = from_origin(left, top, meters_per_pixel, meters_per_pixel)
+    with rasterio.open(dest_file, 'w', driver='GTiff',
+                    height = r.shape[0], width = r.shape[1],
+                    count=r.shape[-1], dtype=str(r.dtype),
+                    crs=utm_crs, #CRS.from_epsg(4326),
+                    nodata=0,
+                    transform=transform) as new_dataset:
+        for i in range(r.shape[-1]):
+            new_dataset.write(r[:,:,i], i+1)
+
+    print ("\nmosaic written to", dest_file)

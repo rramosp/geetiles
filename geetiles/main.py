@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 from .cmds import *
 from . import __version__
 
@@ -73,6 +74,11 @@ def main():
     mosaic_parser.add_argument('--meters_per_pixel', required=True, type=int, help='an int, meters per each pixel in the resulting mosaic.')
     mosaic_parser.add_argument('--channels', default=None, type=str, help='a list of ints with the channels to include in the mosaic. If not set, only channel0 will be used')
 
+
+    vmosaic_parser = subparsers.add_parser('mosaic.fromvals', help='make a single image with tile values specified in a tiles file.')
+    vmosaic_parser.add_argument('--tiles_file', required=True, type=str, help="geojson that must have columns 'identifier', 'value', 'geometry'.")
+    vmosaic_parser.add_argument('--dest_file', required=True, type=str, help='file where to store the mosaic in GeoTIFF format.')
+    vmosaic_parser.add_argument('--meters_per_pixel', required=True, type=int, help='an int, meters per each pixel in the resulting mosaic.')
 
     cleanup_parser = subparsers.add_parser('cleanup', help='cleans up a folder with tifs, removing the ones unreadable.')
     cleanup_parser.add_argument('--basedir', required=True, type=str, help='folder with tifs.')
@@ -174,3 +180,10 @@ def main():
                     images_dataset_def  = args.images_dataset_def, 
                     labels_dataset_def  = args.labels_dataset_def, 
                     readme_file         = args.readme_file)
+        
+    elif args.cmd == 'mosaic.fromvals':
+        print ("making mosaic from tile values")
+        make_mosaic_for_tilevalues(tiles_file       = args.tiles_file,
+                                   meters_per_pixel = args.meters_per_pixel, 
+                                   dest_file        = args.dest_file,
+                                   dtype            = np.float32)
