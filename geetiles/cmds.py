@@ -9,6 +9,7 @@ import geopandas as gpd
 import numpy as np
 import shapely as sh
 from joblib import delayed
+from joblib import Parallel
 from pyproj import CRS
 from progressbar import progressbar as pbar
 from skimage.io import imread
@@ -265,7 +266,7 @@ def build_grid(aoi, chip_size_meters):
     # create a polygon at each point
     print (f"inspecting {gridx*gridy} chips", flush=True)
 
-    parts = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_polygon)(m, gx, gy, minx, miny) \
+    parts = Parallel(n_jobs=-1, verbose=30)(delayed(get_polygon)(m, gx, gy, minx, miny) \
                                             for gx,gy in itertools.product(range(gridx), range(gridy)))
     parts = [i for i in parts if i is not None and aoi.intersects(i)]
     parts = gpd.GeoDataFrame(parts, columns=['geometry'], crs=epsg4326)
