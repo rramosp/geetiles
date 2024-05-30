@@ -10,6 +10,10 @@ install with
 
     pip install geetiles
 
+authenticate to Google Earth Engine CLI with
+
+    earthengine authenticate --force
+
 
 ### 1. create grid on a given area of interest as wkt
 

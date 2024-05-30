@@ -54,10 +54,10 @@ class DatasetDefinition:
         s2rgb = None
         for month, dates in months.items():
 
-            sentinel1 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+            sentinel2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
                         .filterDate(dates[0], dates[1])
         
-            t = sentinel1\
+            t = sentinel2\
                             .filterDate(dates[0],dates[1])\
                             .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE',20))\
                             .map(maskS2clouds)\
