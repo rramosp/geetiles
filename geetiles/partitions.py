@@ -387,8 +387,17 @@ class PartitionSet:
         print (f"all splits saved to {fname}")
 
     @classmethod
-    def from_file(cls, filename):
+    def from_file(cls, filename, groups=None):
         data = gpd.read_file(filename)
+
+        if groups is not None:
+            if not 'group' in data.columns:
+                raise ValueError(f"you specified groups {groups}, but there is no 'group' column in tiles_file")
+            original_datalen = len(data)
+            lgroups = groups.split(",")
+            data = data[data.group.isin(lgroups)]
+            print (f"downloading only tiles in groups '{groups}', original data had {original_datalen} tiles, downloading {len(data)} tiles")
+
         r = cls("fromfile", data=data)
         r.origin_file = filename
         pname = re.search('_partitions_(.+?)_', filename)
