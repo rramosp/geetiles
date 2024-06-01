@@ -1,7 +1,17 @@
 import ee
 from geetiles import utils
+import rasterio
+import numpy as np
 
 class DatasetDefinition:
+
+    """ 
+    the gee collection applies the transformation 10 log_10 \sigma to the backscattering.
+    this results in a range of values of approx [-30,0]
+
+    this class transforms that range into [0,255] so that it can be stored as uint8 without
+    loosing too much precision, and saving storage space.
+    """
 
     def __init__(self, dataset_name):
         self.year = dataset_name.split("-")[-1]
@@ -31,25 +41,25 @@ class DatasetDefinition:
             vvasc = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'ASCENDING'))\
                         .select(['VV'])\
-                        .mean()\
+                        .median()\
                         .rename(f'{season}_vvasc')
 
             vvdes = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))\
                         .select(['VV'])\
-                        .mean()\
+                        .median()\
                         .rename(f'{season}_vvdes')
 
             vhasc = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'ASCENDING'))\
                         .select(['VH'])\
-                        .mean()\
+                        .median()\
                         .rename(f'{season}_vhasc')
 
             vhdes = sentinel1.filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))\
                         .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))\
                         .select(['VH'])\
-                        .mean()\
+                        .median()\
                         .rename(f'{season}_vhdes')
 
             if s1grd is None:
@@ -66,6 +76,28 @@ class DatasetDefinition:
 
     def map_values(self, array):
         return array
-    
+
+    def post_process_tilefile(self, filename):
+        # open raster again to adjust 
+        with rasterio.open(filename) as src:
+            x = src.read()
+
+            # scale image
+            a,b = -30,0
+            x = (255*(x-a)/(b-a)).astype(np.uint8)
+            
+            m = src.read_masks()
+            profile = src.profile.copy()
+            band_names = src.descriptions
+
+        # write image as uint8
+        profile['dtype'] = 'uint8'
+        with rasterio.open(filename, 'w', **profile) as dest:
+            for i in range(src.count):
+                dest.write(x[i,:,:], i+1)      
+                dest.write_mask(m) 
+                dest.set_band_description(i+1, band_names[i])
+
+
     def get_dtype(self):
-        return 'uint16'
+        return 'float32'

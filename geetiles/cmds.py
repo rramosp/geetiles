@@ -50,6 +50,9 @@ def label_proportions_compute(tiles_file,
     label_dataset_definition = utils.get_dataset_definition(labels_dataset_def)
     print ("loading tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
+    if p is None:
+        print ("no geometries found")
+        return
     print(f"computing proportions for {len(p.data)} partitions")
     p.add_proportions(label_dataset_definition, n_jobs=1)
     print ("done!")
@@ -87,6 +90,7 @@ def download(tiles_file,
              skip_if_exists,
              ee_auth_mode,
              n_processes,
+             groups = None,
              skip_confirm=False):
     
     # sanity check
@@ -107,6 +111,8 @@ def download(tiles_file,
     dataset_definition = utils.get_dataset_definition(dataset_def)
     dtype = dataset_definition.get_dtype()
 
+    groups_str = f'groups             {groups}' if groups is not None else ''
+    
     print (f"""
 using the following download specficication
 
@@ -120,7 +126,7 @@ skip_if_exists     {skip_if_exists}
 dtype              {dtype}
 ee_auth_mode       {ee_auth_mode}
 n_processes        {n_processes}
-
+{groups_str}
         """)
     
     if not skip_confirm:
@@ -163,7 +169,7 @@ n_processes        {n_processes}
 
     # download the tiles
     print ("loading chip definitions ... ", flush=True, end="")
-    p = partitions.PartitionSet.from_file(tiles_file)
+    p = partitions.PartitionSet.from_file(tiles_file, groups=groups)
     print ("done", flush=True)
     # save gee_image_codestr
     dest_dir = p.get_downloaded_tiles_dest_dir(dataset_name)

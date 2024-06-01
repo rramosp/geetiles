@@ -6,15 +6,10 @@ from skimage import exposure
 
 class DatasetDefinition:
 
-    """
-    sentinel 2 data is returned as uint8 in the [0,255] range after dividing the original
-    data by 10000 and multiplying by 255 
-    """
-
     def __init__(self, dataset_name):
         dataset_name_components = dataset_name.split("-")
         if len(dataset_name_components)!=2:
-            raise ValueError("incorrect dataset name. must be 's2rgb-2020' or the year you want")
+            raise ValueError("incorrect dataset name. must be 's2-2020' or the year you want")
         
         self.year = dataset_name_components[1]
         self.dataset_name = dataset_name
@@ -35,8 +30,7 @@ class DatasetDefinition:
                 'fall':   [f'{year}-09-01', f'{year}-11-30'],
                 }        
 
-        band_names = ['B4', 'B3', 'B2']
-        band_colornames = ['red', 'green', 'blue']
+        band_names = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B11', 'B12']
 
         chip = None
         for season, dates in seasons.items():
@@ -47,7 +41,7 @@ class DatasetDefinition:
                             .select(band_names)\
                             .median()\
                             .divide(10000).multiply(255).toByte()\
-                            .rename([f'{season}_{b}' for b in band_colornames])
+                            .rename([f'{season}_{b}' for b in band_names])
 
             if chip is None:
                 chip = geeimg 

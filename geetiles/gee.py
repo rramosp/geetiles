@@ -10,6 +10,7 @@ import multiprocessing
 import numpy as np
 import geopandas as gpd
 from pyproj import CRS
+from time import sleep
 
 from . import utils
 
@@ -18,11 +19,16 @@ epsg4326 = utils.epsg4326
 _gee_get_tile_progress_period = 100
 def _get_tile(i,gee_tile):
     # helper function to download gee tiles
-    try:
-        gee_tile.get_tile()
-    except Exception as e:
-        print (f"\n----error----\ntile {gee_tile.identifier}\n------")
-        print (e)
+    for _ in range(3):
+        try:
+            gee_tile.get_tile()
+            break
+        except Exception as e:
+            print (f"\n----error----\ntile {gee_tile.identifier}\n------")
+            print (e)
+            print ("waiting 2secs and retrying")
+            sleep(2)
+        
 
     if i%_gee_get_tile_progress_period==0:
         print (f"{i} ", end="", flush=True)

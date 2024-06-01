@@ -37,6 +37,7 @@ def main():
     dwn_parser.add_argument('--skip_confirm', default=False, action='store_true', help='if set, proceeds with no user confirmation.')
     dwn_parser.add_argument('--ee_auth_mode', default=None, type=str, help='gee auth mode, see https://developers.google.com/earth-engine/apidocs/ee-authenticate.')
     dwn_parser.add_argument('--n_processes', default=10, type=int, help='number of parallel processes.')
+    dwn_parser.add_argument('--groups', default=None, type=str, help="comma separated list of groups of tiles to download (must have 'group' column in tiles_file).")
 
     int_parser = subparsers.add_parser('intersect', help='for each tile, it gets the largest tile id from another set intersecting it.')
     int_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
@@ -141,7 +142,8 @@ def main():
                         skip_if_exists    = args.skip_if_exists,
                         ee_auth_mode      = args.ee_auth_mode,
                         skip_confirm      = args.skip_confirm, 
-                        n_processes       = args.n_processes
+                        n_processes       = args.n_processes,
+                        groups            = args.groups
                     )
         except ValueError as e:
             print ("ERROR.", e)
