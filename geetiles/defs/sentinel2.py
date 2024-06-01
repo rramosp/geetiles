@@ -9,7 +9,7 @@ class DatasetDefinition:
     def __init__(self, dataset_name):
         dataset_name_components = dataset_name.split("-")
         if len(dataset_name_components)!=2:
-            raise ValueError("incorrect dataset name. must be 's2rgb-2020' or the year you want")
+            raise ValueError("incorrect dataset name. must be 'sentinel2-2020' or the year you want")
         
         self.year = dataset_name_components[1]
         self.dataset_name = dataset_name
