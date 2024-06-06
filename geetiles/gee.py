@@ -162,6 +162,7 @@ class GEETile:
         ext = 'tif'
         outdir = os.path.abspath(self.dest_dir)
         filename    = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}"
+        msk_filename = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}.msk"
 
         if self.skip_if_exists:
             if os.path.exists(filename):
@@ -242,8 +243,12 @@ class GEETile:
                     dest.write_band(i+1, out_image[i]  )
                 dest.set_band_description(i+1, band_names[i])
 
+
+
         try:
             self.dataset_definition.post_process_tilefile(filename)
+            if os.path.isfile(msk_filename):
+                os.remove(msk_filename)
         except AttributeError as e:
             # if dataset definition does not have the method
             pass

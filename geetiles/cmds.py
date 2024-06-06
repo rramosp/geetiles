@@ -19,6 +19,7 @@ import rasterio
 from skimage.transform import resize
 from rasterio.transform import from_origin
 from scipy.ndimage import rotate
+from time import sleep
 
 from . import partitions
 from . import utils
@@ -155,7 +156,15 @@ n_processes        {n_processes}
     else:
         ee.Authenticate(auth_mode = ee_auth_mode)
 
-    ee.Initialize()
+    for i in range(10):
+        try:
+            ee.Initialize()
+        except Exception as e:
+            if i==9:
+                raise e
+            print ("error initializing gee", e)
+            print ("waiting 2 secs to retry")
+            sleep(2)
 
     dataset_name = dataset_definition.get_dataset_name()
 
@@ -172,6 +181,8 @@ n_processes        {n_processes}
     p = partitions.PartitionSet.from_file(tiles_file, groups=groups)
     print ("done", flush=True)
     # save gee_image_codestr
+    if p is None:
+        return
     dest_dir = p.get_downloaded_tiles_dest_dir(dataset_name)
     os.makedirs(dest_dir, exist_ok=True)
     with open(f"{dest_dir}.dataset_def.py", "w") as f:
