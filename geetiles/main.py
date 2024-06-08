@@ -38,6 +38,12 @@ def main():
     dwn_parser.add_argument('--ee_auth_mode', default=None, type=str, help='gee auth mode, see https://developers.google.com/earth-engine/apidocs/ee-authenticate.')
     dwn_parser.add_argument('--n_processes', default=10, type=int, help='number of parallel processes.')
     dwn_parser.add_argument('--groups', default=None, type=str, help="comma separated list of groups of tiles to download (must have 'group' column in tiles_file).")
+    dwn_parser.add_argument('--aoi', default=None, type=str, help="any allowed predefined aoi name. run 'geet aois' to get a list.")
+
+    aoi_parser = subparsers.add_parser('aois', help='commands to inspect the allowed list of aois')
+    aoi_parser.add_argument('--showall', default=False, action='store_true', help='shows the list of predefined aois.')
+    aoi_parser.add_argument('--extract', default=None, type=str, help="extracts aoi to a wkt file.")
+
 
     int_parser = subparsers.add_parser('intersect', help='for each tile, it gets the largest tile id from another set intersecting it.')
     int_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326.')
@@ -143,7 +149,8 @@ def main():
                         ee_auth_mode      = args.ee_auth_mode,
                         skip_confirm      = args.skip_confirm, 
                         n_processes       = args.n_processes,
-                        groups            = args.groups
+                        groups            = args.groups,
+                        aoi               = args.aoi
                     )
         except ValueError as e:
             print ("ERROR.", e)
@@ -165,6 +172,13 @@ def main():
                                        foreign_tiles_file = args.foreign_tiles_file,
                                        labels_dataset_def = args.labels_dataset_def)  
         
+    elif args.cmd == 'aois':
+        if args.showall:
+            print ("showing predefined aois")
+            show_aois()
+        elif args.extract:
+            extract_aoi(args.extract)
+
     elif args.cmd == 'split':
         print ("splitting bands")
         split(tiles_file         = args.tiles_file, 

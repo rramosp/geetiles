@@ -2,6 +2,7 @@
 import itertools
 import ee
 import os
+import sys
 import shutil
 import pickle
 from shapely import wkt
@@ -92,6 +93,7 @@ def download(tiles_file,
              ee_auth_mode,
              n_processes,
              groups = None,
+             aoi = None,
              skip_confirm=False):
     
     # sanity check
@@ -108,11 +110,12 @@ def download(tiles_file,
         except:
             raise ValueError("'pixels_lonlat' must be a tuple of two ints such as --pixels_lonlat [100,100]")
 
-
+    print ("XXXX", aoi)
     dataset_definition = utils.get_dataset_definition(dataset_def)
     dtype = dataset_definition.get_dtype()
 
     groups_str = f'groups             {groups}' if groups is not None else ''
+    aoi_str    = f'aoi                {aoi}' if aoi is not None else ''
     
     print (f"""
 using the following download specficication
@@ -128,6 +131,7 @@ dtype              {dtype}
 ee_auth_mode       {ee_auth_mode}
 n_processes        {n_processes}
 {groups_str}
+{aoi_str}
         """)
     
     if not skip_confirm:
@@ -178,7 +182,7 @@ n_processes        {n_processes}
 
     # download the tiles
     print ("loading chip definitions ... ", flush=True, end="")
-    p = partitions.PartitionSet.from_file(tiles_file, groups=groups)
+    p = partitions.PartitionSet.from_file(tiles_file, groups=groups, aoi=aoi)
     print ("done", flush=True)
     # save gee_image_codestr
     if p is None:
@@ -212,6 +216,79 @@ def make_random_partitions(aoi_wkt_file, max_rectangle_size_meters, aoi_name, de
     parts.save_as(dest_dir, f'{max_rectangle_size_meters//1000}k')
     
     return parts.data
+
+def show_aois():
+
+    utils.aoinames.load()
+
+    print ("----------------------------")
+    print ("COUNTRY NAMES")
+    print ("use full country name (in quotes if it has spaces) or country code")
+    print ()
+    ccodes = utils.aoinames.get_country_codes()
+    scodes = sorted(ccodes.keys())
+    snames = [ccodes[ci] for ci in scodes]
+
+    irange = list(range(len(scodes)))
+
+    ncols = 4
+    nrows = len(scodes)//ncols
+    if len(scodes)/ncols > len(scodes)//ncols:
+        nrows += 1
+
+    for si in range(nrows):
+        for sii in range(ncols):
+            n = si+sii+sii*(nrows-1)
+            if n>=len(scodes):
+                break
+            print (f'{scodes[n]:32s} {snames[n]:3s}   ', end=" ")
+        print()
+
+
+    print ("\n\n-----------------------------------")
+    print ("CONTINENT NAMES")
+    print ("use name in quotes if it has spaces")
+    print ("-----------------------------------")
+    for c in sorted(np.unique(utils.aoinames.data['CONTINENT'])):
+        print (c)
+
+    print ("\n\n-----------------------------------")
+    print ("UN REGION NAMES")
+    print ("use name in quotes if it has spaces")
+    print ("-----------------------------------")
+    for c in sorted(np.unique(utils.aoinames.data['REGION_UN'])):
+        print (c)
+
+
+    print ("\n\n-----------------------------------")
+    print ("SUB REGION NAMES")
+    print ("use name in quotes if it has spaces")
+    print ("-----------------------------------")
+    for c in sorted(np.unique(utils.aoinames.data['SUBREGION'])):
+        print (c)
+
+    print ("\n\n-----------------------------------")
+    print ("OTHER COMMON NAMES")
+    print ("use name in quotes if it has spaces")
+    print ("-----------------------------------")
+    for c in sorted(np.unique(utils.aoinames.data['REGION_WB'])):
+        print (c)
+
+
+
+def extract_aoi(aoiname):
+    utils.aoinames.load()
+
+    geom = utils.aoinames.get_aoi(aoiname)
+
+    if geom is None:
+        print (f"AOI '{aoiname}' does not exist")
+
+    else:
+        fname = f"{aoiname}.wkt"
+        with open(fname, "w") as f:
+            f.write(wkt.dumps(geom))
+        print (f"aoi saved to '{fname}'")
 
 def make_grid(aoi_wkt_file, chip_size_meters, aoi_name, dest_dir):
     

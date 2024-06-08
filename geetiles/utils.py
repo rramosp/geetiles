@@ -3,6 +3,8 @@ import sys
 import hashlib
 import numpy as np
 import pandas as pd
+import geopandas as gpd
+import shapely as sh
 from joblib import Parallel
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
@@ -130,6 +132,50 @@ class mParallel(Parallel):
             fmsg = '[%s]: %s' % (self, msg % msg_args)
             sys.stdout.write('\r ' + fmsg)
             sys.stdout.flush()
+
+
+
+class AOINames:
+    """
+    a class to hold the allowed AOI names
+    """
+    def __init__(self):
+        pass
+    
+    def load(self):
+        import pkg_resources
+
+        stream = pkg_resources.resource_stream(__name__, 'data/natural_earth.parquet')
+        self.data = gpd.read_parquet(stream)
+
+    def get_country_codes(self):
+        ccodes = {}
+        for _,row in self.data.iterrows():
+            code = row.SOV_A3
+            if code[-1]=='1':
+                code = code[:-1]
+            ccodes[row.SOVEREIGNT] = code
+        return ccodes
+
+    def get_aoi(self, aoiname):
+
+        if len(aoiname)==2:
+            zaoiname=f'{aoiname}1'
+        else:
+            zaoiname = aoiname
+        search_cols = ['SOVEREIGNT', 'SOV_A3', 'CONTINENT', 'REGION_UN', 'SUBREGION', 'REGION_WB']
+        r = None
+        for col in search_cols:
+            if zaoiname.lower() in self.data[col].str.lower().values:
+                r = self.data[self.data[col].str.lower()==zaoiname.lower()]
+                break
+        if r is None:
+            return None
+        else:
+            return sh.ops.unary_union(r.geometry.values)
+
+aoinames = AOINames()
+
 
 def expand_dict_column(d, col):
     """

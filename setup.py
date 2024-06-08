@@ -16,6 +16,8 @@ setup(name='geetiles',
                   "geet = geetiles.main:main",
             ],      
       },
+      package_data={'': ['data/natural_earth_countries.parquet']},
+
       packages=['geetiles'],
       include_package_data=True,
       zip_safe=False)

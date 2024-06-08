@@ -387,15 +387,23 @@ class PartitionSet:
         print (f"all splits saved to {fname}")
 
     @classmethod
-    def from_file(cls, filename, groups=None):
+    def from_file(cls, filename, groups=None, aoi=None):
         data = gpd.read_file(filename)
+
+        if aoi is not None:
+            utils.aoinames.load()
+            aoigeom = utils.aoinames.get_aoi(aoi)
+            print (f"restricting data to '{aoi}'")
+            data = data[[gi.intersects(aoigeom) for gi in data.geometry.values]]
 
         if groups is not None:
             if not 'group' in data.columns:
                 raise ValueError(f"you specified groups {groups}, but there is no 'group' column in tiles_file")
+
             original_datalen = len(data)
             lgroups = groups.split(",")
-            data = data[data.group.isin(lgroups)]
+            isingroups = lambda row: len(set(row['group'].split(',')).intersection(lgroups))>0
+            data = data[data.apply(isingroups, axis=1)].copy()
             print (f"\ndownloading only tiles in groups '{groups}', original data had {original_datalen} tiles, downloading {len(data)} tiles")
 
 

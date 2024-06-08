@@ -155,15 +155,27 @@ class GEETile:
         if pixels_lonlat is not None:
             self.pixels_lon, self.pixels_lat = pixels_lonlat
 
-    #@retry(tries=10, delay=1, backoff=2)
-    def get_tile(self):
-
+    def get_filename(self):
         # check if should skip
         ext = 'tif'
         outdir = os.path.abspath(self.dest_dir)
         filename    = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}"
         msk_filename = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}.msk"
 
+        return filename, msk_filename
+
+    def get_tile(self):
+
+        filename, msk_filename = self.get_filename()
+
+        """
+        # check if should skip
+        ext = 'tif'
+        outdir = os.path.abspath(self.dest_dir)
+        filename    = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}"
+        msk_filename = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}.msk"
+
+        """
         if self.skip_if_exists:
             if os.path.exists(filename):
                 return
@@ -172,7 +184,6 @@ class GEETile:
                not self.dataset_definition.must_get_gee_image(filename):
                 print ("skipping", filename)
                 return
-
 
         # get appropriate utm crs for this tile_geometry to measure stuff in meters 
         lon, lat = list(self.tile_geometry.envelope.boundary.coords)[0]
@@ -199,14 +210,23 @@ class GEETile:
         if image_collection is None:
             return
 
-        url = image_collection.getDownloadURL(
-            {
-                'region': rectangle,
-                'dimensions': dims,
-                'format': 'GEO_TIFF',
-                'crs': 'EPSG:4326'
-            }
-        )
+
+        try:
+            url = image_collection.getDownloadURL(
+                {
+                    'region': rectangle,
+                    'dimensions': dims,
+                    'format': 'GEO_TIFF',
+                    'crs': 'EPSG:4326'
+                }
+            )
+        except Exception as e:
+            # allow dataset to deal with errors
+            if 'on_error' in dir(self.dataset_definition):
+                self.dataset_definition.on_error(self, e)
+                return
+            else:
+                raise(e)
 
         band_names = image_collection.bandNames().getInfo()
     
@@ -243,12 +263,10 @@ class GEETile:
                     dest.write_band(i+1, out_image[i]  )
                 dest.set_band_description(i+1, band_names[i])
 
-
-
-        try:
+        # give the dataset a chance to do stuff with the downloaded tile
+        if 'post_process_tilefile' in dir(self.dataset_definition):
             self.dataset_definition.post_process_tilefile(filename)
-            if os.path.isfile(msk_filename):
-                os.remove(msk_filename)
-        except AttributeError as e:
-            # if dataset definition does not have the method
-            pass
+
+        # cleanup
+        if os.path.isfile(msk_filename):
+            os.remove(msk_filename)
