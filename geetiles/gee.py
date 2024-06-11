@@ -11,27 +11,106 @@ import numpy as np
 import geopandas as gpd
 from pyproj import CRS
 from time import sleep
-
+import re
 from . import utils
+import glob
 
 epsg4326 = utils.epsg4326
 
 _gee_get_tile_progress_period = 100
-def _get_tile(i,gee_tile):
+
+exceeded_size_regexp = "Total request size \((.*) bytes\) must be less than or equal to (.*) bytes"
+
+def _get_tile_byparts(progress_seq, gee_tile, total_size, max_size):
+    """
+    gets a tile by splitting the downloads by band sets so that it fits the max_size
+    """
+
+    # get the band names to download in subsets of bands
+    gee_img = gee_tile.dataset_definition.get_gee_image(tile_geometry = gee_tile.tile_geometry)
+    info = gee_img.getInfo()
+    bands = [v['id'] for v in info['bands']]
+    nbands = len(bands)
+    # consider bands are larger due to overheads in http, etc.
+    size_per_band = 1.5 * total_size / nbands  
+
+    if size_per_band>max_size:
+        raise ValueError(f"image has {nbands} bands and a total size of {total_size}. cannot fit to a max size of {max_size}")
+
+    # split bands to download separate sets within allowed size                    
+    bands_per_split = int(np.floor(max_size / size_per_band))
+
+    split_idxs = list(range(0, nbands, bands_per_split))
+    if split_idxs[-1]!=nbands+1:
+        split_idxs.append(nbands+1)
+    
+    band_sets = [bands[split_idxs[i]:split_idxs[i+1]] for i in range(len(split_idxs)-1)]
+
+    # download each band set
+    for part_id, band_set in enumerate(band_sets):
+        _get_tile(progress_seq=None, gee_tile=gee_tile, bands=band_set, filename_postfix=f'__part{part_id:02d}')
+
+    # stich them together
+    filename = gee_tile.get_filename()[0]
+    fileparts = sorted([i for i in glob.glob(f"{filename}__part*") if not '.msk' in i])
+
+    # open first one to get crs, transform, etc.
+    with rasterio.open(fileparts[0]) as f:
+        profile = f.profile.copy()
+
+    # stick together all data and band descriptions
+    x, d = [], []
+    for filepart in fileparts:
+        with rasterio.open(filepart) as f:
+            for xi in f.read():
+                x.append(xi)
+            d += list(f.descriptions)
+    x = np.stack(x)
+    profile['count'] = len(x)
+
+    # write single file
+    with rasterio.open(filename, 'w', **profile) as dest:    
+        dest.write(x)
+        for i in range(len(d)):
+            dest.set_band_description(i+1, d[i])
+
+    # remove parts
+    files_to_remove = sorted([i for i in glob.glob(f"{filename}__part*")])
+
+    for file_to_remove in files_to_remove:
+        os.remove(file_to_remove)
+
+
+def _get_tile(progress_seq, gee_tile, bands=None, filename_postfix='', n_retries=3):
     # helper function to download gee tiles
-    for _ in range(3):
+    for _ in range(n_retries):
         try:
-            gee_tile.get_tile()
-            break
+            gee_tile.get_tile(bands=bands, filename_postfix=filename_postfix)
+            break # success
         except Exception as e:
-            print (f"\n----error----\ntile {gee_tile.identifier}\n------")
-            print (e)
-            print ("waiting 2secs and retrying")
-            sleep(2)
+
+            # in case download size exceeded, attempt to split download in band sets
+            rr = re.findall(exceeded_size_regexp, str(e))
+            if len(rr)==1 and len(rr[0])==2:
+                total_size, max_size = rr[0]
+                total_size = int(total_size)
+                max_size = int(max_size)
+
+                try:
+                    _get_tile_byparts(progress_seq, gee_tile, total_size, max_size)
+                except Exception as e:
+                    print (f"\n----error getting tile {gee_tile.identifier} by parts\n----", e, "\n----waiting 2secs and retrying")
+                    raise(e)
+                    sleep(2)
+                break
+
+            else:
+                print (f"\n----error getting tile {gee_tile.identifier}\n----", e, "\n----waiting 2secs and retrying")
+                sleep(2)
         
 
-    if i%_gee_get_tile_progress_period==0:
-        print (f"{i} ", end="", flush=True)
+    if progress_seq is not None and progress_seq%_gee_get_tile_progress_period==0:
+        print (f"{progress_seq} ", end="", flush=True)
 
 def get_gee_tiles(self, 
                     dataset_definition, 
@@ -164,18 +243,12 @@ class GEETile:
 
         return filename, msk_filename
 
-    def get_tile(self):
+    def get_tile(self, bands=None, filename_postfix=''):
 
         filename, msk_filename = self.get_filename()
+        filename += filename_postfix
+        msk_filename += filename_postfix
 
-        """
-        # check if should skip
-        ext = 'tif'
-        outdir = os.path.abspath(self.dest_dir)
-        filename    = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}"
-        msk_filename = f"{outdir}/{self.file_prefix}{self.identifier}.{ext}.msk"
-
-        """
         if self.skip_if_exists:
             if os.path.exists(filename):
                 return
@@ -204,15 +277,19 @@ class GEETile:
             # in case multipolygon, or mutipart or other shapely geometries without a boundary
             rectangle = ee.Geometry.Polygon(list(self.tile_geometry.envelope.boundary.coords)) 
 
-        image_collection = self.dataset_definition.get_gee_image(tile_geometry = self.tile_geometry)
+        image = self.dataset_definition.get_gee_image(tile_geometry = self.tile_geometry)
+
+        if bands is not None:
+            image = image.select(bands)
+
 
         # if no image collection do nothing
-        if image_collection is None:
+        if image is None:
             return
 
 
         try:
-            url = image_collection.getDownloadURL(
+            url = image.getDownloadURL(
                 {
                     'region': rectangle,
                     'dimensions': dims,
@@ -221,6 +298,10 @@ class GEETile:
                 }
             )
         except Exception as e:
+            # exceeded size must be dealt with by the framework
+            if re.search(exceeded_size_regexp, str(e)):
+                raise(e)
+
             # allow dataset to deal with errors
             if 'on_error' in dir(self.dataset_definition):
                 self.dataset_definition.on_error(self, e)
@@ -228,7 +309,7 @@ class GEETile:
             else:
                 raise(e)
 
-        band_names = image_collection.bandNames().getInfo()
+        band_names = image.bandNames().getInfo()
     
         # download and save to tiff
         r = requests.get(url, stream=True)

@@ -18,12 +18,12 @@ class DatasetDefinition:
         self.dataset_name = dataset_name
 
         name_split = dataset_name.split("-")
-        if len(name_split) != 3:
-            raise ValueError(f"dataset must be year, month and direction, for instance 's1grdobs-202201-asc' for jan 2022 ascending")
+        if len(name_split) != 2:
+            raise ValueError(f"dataset must be year, month, for instance 's1grdobs-202201' for jan 2022")
 
         yearmonth = name_split[1]
         if len(yearmonth)!=6 :
-            raise ValueError(f"dataset must be year and month, for instance '{dataset_name}-202201' for jan 2022")
+            raise ValueError(f"dataset must be year and month, for instance 's1grdobs-202201' for jan 2022")
 
         self.year = yearmonth[:4]
         self.month = yearmonth[4:]
@@ -39,10 +39,6 @@ class DatasetDefinition:
             raise ValueError(f"dataset must be year, month and direction, for instance 's1grdobs-202201-asc' for jan 2022 ascending")
 
 
-        self.direction = name_split[-1]
-        if not self.direction in ['asc', 'des']:
-            raise ValueError(f"invalid direction '{self.direction}'. must be 'asc' or 'des")
-
     def get_dataset_name(self):
         return self.dataset_name
     
@@ -56,6 +52,26 @@ class DatasetDefinition:
             return False
         return True
 
+
+    def get_s1_img(self, tile_geometry, direction, day):
+        start_date = f"{self.year}-{self.month}-{day:02d}T00:00:00"
+        end_date   = f"{self.year}-{self.month}-{day:02d}T23:59:59"
+        
+        geom = ee.Geometry.Polygon(list(tile_geometry.boundary.coords))
+
+        imgcol = ee.ImageCollection('COPERNICUS/S1_GRD')\
+                    .filterDate(start_date, end_date)\
+                    .filterBounds(geom) \
+                    .filter(ee.Filter.eq('orbitProperties_pass', direction))\
+                    .select(['VV', 'VH', 'angle'])
+
+        imgcol_renamed = imgcol.map(lambda image: 
+                                        image.rename([ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_VV'),
+                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_VH'),
+                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_angle')]))
+
+        return imgcol_renamed.max()
+
     def get_gee_image(self, tile_geometry, **kwargs):
         s1grd = None
         year = self.year
@@ -63,31 +79,9 @@ class DatasetDefinition:
                   '04': 30, '05': 31, '06': 30,
                   '07': 31, '08': 31, '09': 30,
                   '10': 31, '11': 30, '12': 31}
-
-        geom = ee.Geometry.Polygon(list(tile_geometry.boundary.coords))
-
-        def get_s1_img(direction, day):
-            start_date = f"{self.year}-{self.month}-{day:02d}T00:00:00"
-            end_date   = f"{self.year}-{self.month}-{day:02d}T23:59:59"
-            
-            imgcol = ee.ImageCollection('COPERNICUS/S1_GRD')\
-                        .filterDate(start_date, end_date)\
-                        .filterBounds(geom) \
-                        .filter(ee.Filter.eq('orbitProperties_pass', direction))\
-                        .select(['VV', 'VH', 'angle'])
-
-            imgcol_renamed = imgcol.map(lambda image: 
-                                            image.rename([ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_VV'),
-                                                          ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_VH'),
-                                                          ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_angle')]))
-
-            return imgcol_renamed.max()
         
-        
-        # get a mean image for each day (days with no images will disappear)
-        s1direction = 'ASCENDING' if self.direction == 'asc' else 'DESCENDING'
-
-        imgs =  [get_s1_img(s1direction, day) for day in range(1, endday[self.month]+1)]
+        imgs =   [self.get_s1_img(tile_geometry, 'ASCENDING', day) for day in range(1, endday[self.month]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', day) for day in range(1, endday[self.month]+1)]
         collection = ee.ImageCollection.fromImages(imgs)         
 
         # flatten the bands
