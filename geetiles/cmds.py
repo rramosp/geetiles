@@ -110,7 +110,6 @@ def download(tiles_file,
         except:
             raise ValueError("'pixels_lonlat' must be a tuple of two ints such as --pixels_lonlat [100,100]")
 
-    print ("XXXX", aoi)
     dataset_definition = utils.get_dataset_definition(dataset_def)
     dtype = dataset_definition.get_dtype()
 

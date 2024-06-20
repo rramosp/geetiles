@@ -39,6 +39,11 @@ class DatasetDefinition:
             raise ValueError(f"dataset must be year, month and direction, for instance 's1grdobs-202201-asc' for jan 2022 ascending")
 
 
+        self.band0 = 'VV'
+        self.band1 = 'VH'
+        self.band2 = 'angle'
+
+
     def get_dataset_name(self):
         return self.dataset_name
     
@@ -63,12 +68,12 @@ class DatasetDefinition:
                     .filterDate(start_date, end_date)\
                     .filterBounds(geom) \
                     .filter(ee.Filter.eq('orbitProperties_pass', direction))\
-                    .select(['VV', 'VH', 'angle'])
+                    .select([self.band0, self.band1, self.band2])
 
         imgcol_renamed = imgcol.map(lambda image: 
-                                        image.rename([ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_VV'),
-                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_VH'),
-                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_angle')]))
+                                        image.rename([ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_{self.band0}'),
+                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_{self.band1}'),
+                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_{self.band2}')]))
 
         return imgcol_renamed.max()
 

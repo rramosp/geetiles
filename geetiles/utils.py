@@ -11,6 +11,7 @@ from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info
 from rasterio.features import rasterize
 import shapely as sh
+from shapely import wkt
 from alphashape import alphashape
 from progressbar import progressbar as pbar
 
@@ -158,6 +159,11 @@ class AOINames:
         return ccodes
 
     def get_aoi(self, aoiname):
+
+        if os.path.isfile(aoiname):
+            with open(aoiname) as f:
+                aoi = wkt.load(f)
+            return aoi
 
         if len(aoiname)==2:
             zaoiname=f'{aoiname}1'
