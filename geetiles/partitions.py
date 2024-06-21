@@ -215,14 +215,15 @@ class PartitionSet:
         self.partitions_name = partitions_name
         return self      
 
-    def save(self):
+    def save(self, ignore_hash=False):
         """
         method used to save partitions previously loaded (after adding some column or metadata)
         """
-        computed_hash = utils.get_regionlist_hash(self.data.geometry)
-        filename_hash = os.path.splitext(os.path.basename(self.origin_file))[0].split("_")[-1]
-        if computed_hash != filename_hash:
-            raise ValueError("cannot save since geometries changed, use save_as to create a new partition set")
+        if not ignore_hash:
+            computed_hash = utils.get_regionlist_hash(self.data.geometry)
+            filename_hash = os.path.splitext(os.path.basename(self.origin_file))[0].split("_")[-1]
+            if computed_hash != filename_hash:
+                raise ValueError("cannot save since geometries changed, use save_as to create a new partition set")
         self.data.to_file(self.origin_file, driver='GeoJSON')
         print (f"saved to {self.origin_file}")
 
@@ -338,6 +339,9 @@ class PartitionSet:
         else:
             plon, plat = np.sign(angle), (np.pi/2-np.abs(angle))/(np.pi/4)
         
+        # in case we have a small number of tiles
+        crng[crng==0]=1
+
         ncoords = (coords - cmin)/crng
 
         if angle<0:
@@ -360,8 +364,8 @@ class PartitionSet:
         split = [band_split_map[i] for i in band_id]
 
         self.data[split_col_name] = split
-
         
+
     def split_per_partitions(self, nbands, angle, train_pct, test_pct, val_pct, other_partitions_id):
         """
         splits the geometries (as in 'split'), but modifies the result keeping together 
@@ -383,7 +387,7 @@ class PartitionSet:
         fname = os.path.splitext(self.origin_file)[0] + "_splits.csv"
         splits_df = self.data[[c for c in self.data.columns if ('split' in c and c!='split_nb') or c=='identifier']]
         splits_df.to_csv(fname, index=False)
-        self.save()
+        self.save(ignore_hash=True)
         print (f"all splits saved to {fname}")
 
     @classmethod
