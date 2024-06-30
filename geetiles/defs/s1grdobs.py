@@ -29,20 +29,21 @@ class DatasetDefinition:
         self.month = yearmonth[4:]
 
         try:
-            year = int(self.year)
-            month = int(self.month)
+            _year = int(self.year)
+            _month = int(self.month)
 
-            if month<1 or month>12:
-                raise ValueError(f"invalid month {month}. dataset must be year, month and direction, for instance 's1grdobs-202201-asc' for jan 2022 ascending")
+            if _month<1 or _month>12:
+                raise ValueError(f"invalid month {_month}. dataset must be year and month, for instance 's1grdobs-202201' for jan 2022")
 
         except Exception as e:
-            raise ValueError(f"dataset must be year, month and direction, for instance 's1grdobs-202201-asc' for jan 2022 ascending")
+            raise ValueError(f"dataset must be year and month, for instance 's1grdobs-202201' for jan 2022")
 
 
-        self.band0 = 'VV'
-        self.band1 = 'VH'
-        self.band2 = 'angle'
-
+        # self.band0 = 'VV'
+        # self.band1 = 'VH'
+        # self.band2 = 'angle'
+        #self.bands = ['VV', 'VH', 'HH', 'HV', 'angle']
+        self.bands = ['VV', 'VH', 'angle']
 
     def get_dataset_name(self):
         return self.dataset_name
@@ -58,7 +59,7 @@ class DatasetDefinition:
         return True
 
 
-    def get_s1_img(self, tile_geometry, direction, day):
+    def get_s1_img(self, tile_geometry, direction, year, month, day):
         start_date = f"{self.year}-{self.month}-{day:02d}T00:00:00"
         end_date   = f"{self.year}-{self.month}-{day:02d}T23:59:59"
         
@@ -68,12 +69,14 @@ class DatasetDefinition:
                     .filterDate(start_date, end_date)\
                     .filterBounds(geom) \
                     .filter(ee.Filter.eq('orbitProperties_pass', direction))\
-                    .select([self.band0, self.band1, self.band2])
+                    .select(self.bands)
+
+        imgcol_renamed = imgcol
 
         imgcol_renamed = imgcol.map(lambda image: 
-                                        image.rename([ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_{self.band0}'),
-                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_{self.band1}'),
-                                                        ee.String(f'xxx_{self.year}-{self.month}-{day:02d}_{direction[:3]}_{self.band2}')]))
+                                        image.rename([ee.String(f'xxx_{year}-{month}-{day:02d}_{direction[:3]}_{self.bands[0]}'),
+                                                        ee.String(f'xxx_{year}-{month}-{day:02d}_{direction[:3]}_{self.bands[1]}'),
+                                                        ee.String(f'xxx_{year}-{month}-{day:02d}_{direction[:3]}_{self.bands[2]}')]))
 
         return imgcol_renamed.max()
 
@@ -84,9 +87,30 @@ class DatasetDefinition:
                   '04': 30, '05': 31, '06': 30,
                   '07': 31, '08': 31, '09': 30,
                   '10': 31, '11': 30, '12': 31}
+
+
+        def prev_yearmonth(year, month):
+            if int(month)==1:
+                return f"{int(year)-1:4d}", "12"
+            else:
+                return year, f"{int(month)-1:02d}"
+
+        def next_yearmonth(year, month):
+            if int(month)==12:
+                return f"{int(year)+1:4d}", "01"
+            else:
+                return year, f"{int(month)+1:02d}"                  
         
-        imgs =   [self.get_s1_img(tile_geometry, 'ASCENDING', day) for day in range(1, endday[self.month]+1)]
-        imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', day) for day in range(1, endday[self.month]+1)]
+        ny, nm = next_yearmonth(self.year, self.month)
+        py, pm = prev_yearmonth(self.year, self.month)
+
+        imgs =   [self.get_s1_img(tile_geometry, 'ASCENDING', py, pm, day) for day in range(1, endday[pm]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', py, pm, day) for day in range(1, endday[pm]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'ASCENDING', self.year, self.month, day) for day in range(1, endday[self.month]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', self.year, self.month, day) for day in range(1, endday[self.month]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'ASCENDING', ny, nm, day) for day in range(1, endday[nm]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', ny, nm, day) for day in range(1, endday[nm]+1)]
+
         collection = ee.ImageCollection.fromImages(imgs)         
 
         # flatten the bands
@@ -105,6 +129,7 @@ class DatasetDefinition:
 
     def post_process_tilefile(self, filename):
         # open raster again to adjust 
+        return
         with rasterio.open(filename) as src:
             x = src.read()
             band_names = src.descriptions
