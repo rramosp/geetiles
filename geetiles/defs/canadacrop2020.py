@@ -8,7 +8,7 @@ class DatasetDefinition:
     
     def get_gee_image(self, **kwargs):
         return  ee.ImageCollection('AAFC/ACI')\
-                  .filter(ee.Filter.date('2020-01-01', '2020-12-31'))\
+                  .filter(ee.Filter.date('2021-01-01', '2021-12-31'))\
                   .first()
         
     def map_values(self, array):

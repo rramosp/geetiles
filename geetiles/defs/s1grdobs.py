@@ -3,6 +3,7 @@ from geetiles import utils
 import rasterio
 import numpy as np
 import os
+from datetime import datetime, timedelta
 
 class DatasetDefinition:
 
@@ -60,9 +61,8 @@ class DatasetDefinition:
 
 
     def get_s1_img(self, tile_geometry, direction, year, month, day):
-        start_date = f"{self.year}-{self.month}-{day:02d}T00:00:00"
-        end_date   = f"{self.year}-{self.month}-{day:02d}T23:59:59"
-        
+        start_date = f"{year}-{month}-{day:02d}T00:00:00"
+        end_date   = f"{year}-{month}-{day:02d}T23:59:59"
         geom = ee.Geometry.Polygon(list(tile_geometry.boundary.coords))
 
         imgcol = ee.ImageCollection('COPERNICUS/S1_GRD')\
@@ -99,12 +99,16 @@ class DatasetDefinition:
             if int(month)==12:
                 return f"{int(year)+1:4d}", "01"
             else:
-                return year, f"{int(month)+1:02d}"                  
+                return year, f"{int(month)+1:02d}"   
+
+                       
         
         ny, nm = next_yearmonth(self.year, self.month)
         py, pm = prev_yearmonth(self.year, self.month)
+        
+        imgs = []
 
-        imgs =   [self.get_s1_img(tile_geometry, 'ASCENDING', py, pm, day) for day in range(1, endday[pm]+1)]
+        imgs +=  [self.get_s1_img(tile_geometry, 'ASCENDING', py, pm, day) for day in range(1, endday[pm]+1)]
         imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', py, pm, day) for day in range(1, endday[pm]+1)]
         imgs +=  [self.get_s1_img(tile_geometry, 'ASCENDING', self.year, self.month, day) for day in range(1, endday[self.month]+1)]
         imgs +=  [self.get_s1_img(tile_geometry, 'DESCENDING', self.year, self.month, day) for day in range(1, endday[self.month]+1)]
