@@ -84,10 +84,6 @@ def _get_tile_byparts(progress_seq, gee_tile, total_size, max_size):
 def _get_tile(progress_seq, gee_tile, bands=None, filename_postfix='', n_retries=3):
     # helper function to download gee tiles
 
-    # print ee auth
-    ee.Initialize(project="ee-bde")
-
-
     for _ in range(n_retries):
         try:
             gee_tile.get_tile(bands=bands, filename_postfix=filename_postfix)
