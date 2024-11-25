@@ -6,7 +6,7 @@ from . import __version__
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(title='commands', dest='cmd')
-    
+
     grid_parser = subparsers.add_parser('grid', help='make a grid from an AOI')
     grid_parser.add_argument('--aoi_wkt_file', required=True, type=str, help='the file containing the AOI in lon/lat degrees')
     grid_parser.add_argument('--chip_size_meters', required=True, type=int, help='the length of each tile side in meters')
@@ -27,6 +27,8 @@ def main():
     sel_parser.add_argument('--tiles_name', required=True, type=str, help='a name for the selected geometries, used to name the resulting file')
 
     dwn_parser = subparsers.add_parser('download', help='downloads tiles from gee.')
+
+    dwn_parser.add_argument('--project', required=True, type=str, help='google cloud project with permissions for earth engine - see https://developers.google.com/earth-engine/guides/transition_to_cloud_projects')
     dwn_parser.add_argument('--tiles_file', required=True, type=str, help='output file produced by grid, random or select commands. It requires columns "geometry" and "identifier", and be in crs epsg4326. Downloaded tiles will be stored as geotiffs alongside in the same folder.')
     dwn_parser.add_argument('--dataset_def', required=True, type=str, help="A file with python code defining a class with the dataset definition. See files under defs/ for examples . Can also be the string 'sentinel2-rgb-median-2020' or 'esa-world-cover' for built-in definitions")
     dwn_parser.add_argument('--pixels_lonlat', default=None, type=str, help='a tuple, if set, the tile will have this exact size in pixels, regardless the physical size. For instance --pixels_lonlat [100,100]')
@@ -99,58 +101,59 @@ def main():
     if args.cmd == 'grid':
         print ("making grid", flush=True)
 
-        make_grid(aoi_wkt_file     = args.aoi_wkt_file, 
-                  chip_size_meters = args.chip_size_meters, 
-                  aoi_name         = args.aoi_name, 
+        make_grid(aoi_wkt_file     = args.aoi_wkt_file,
+                  chip_size_meters = args.chip_size_meters,
+                  aoi_name         = args.aoi_name,
                   dest_dir         = args.dest_dir)
-        
+
     elif args.cmd == 'mosaic':
         print("making mosaic", flush = True)
         try:
             channels = eval(args.channels)
         except Exception as e:
             raise ValueError("cannot parse channels list, "+str(e))
-        
+
         make_mosaic(basedir          = args.basedir,
                     meters_per_pixel = args.meters_per_pixel,
                     channels         = channels,
                     dest_file        = args.dest_file)
-        
+
     elif args.cmd == 'cleanup':
         print ("cleaning up tifs", flush=True)
         cleanup(basedir = args.basedir)
 
     elif args.cmd == 'random':
         print ("making random partitions", flush=True)
-        make_random_partitions(aoi_wkt_file              = args.aoi_wkt_file, 
-                               max_rectangle_size_meters = args.max_rectangle_size_meters, 
-                               aoi_name                  = args.aoi_name, 
+        make_random_partitions(aoi_wkt_file              = args.aoi_wkt_file,
+                               max_rectangle_size_meters = args.max_rectangle_size_meters,
+                               aoi_name                  = args.aoi_name,
                                dest_dir                  = args.dest_dir)
-        
+
     elif args.cmd == 'select':
         print ("selecting partitions", flush=True)
         select_partitions(orig_shapefile = args.orig_shapefile,
-                          aoi_wkt_file   = args.aoi_wkt_file, 
-                          aoi_name       = args.aoi_name, 
+                          aoi_wkt_file   = args.aoi_wkt_file,
+                          aoi_name       = args.aoi_name,
                           tiles_name     = args.tiles_name,
                           dest_dir       = args.dest_dir)
-        
+
     elif args.cmd == 'download':
 
         print ("downloading tiles from GEE")
         try:
-            download(   tiles_file        = args.tiles_file, 
-                        dataset_def       = args.dataset_def, 
-                        pixels_lonlat     = args.pixels_lonlat, 
-                        meters_per_pixel  = args.meters_per_pixel, 
+            download(   tiles_file        = args.tiles_file,
+                        dataset_def       = args.dataset_def,
+                        pixels_lonlat     = args.pixels_lonlat,
+                        meters_per_pixel  = args.meters_per_pixel,
                         max_downloads     = args.max_downloads,
                         shuffle           = args.shuffle,
                         skip_if_exists    = args.skip_if_exists,
                         ee_auth_mode      = args.ee_auth_mode,
-                        skip_confirm      = args.skip_confirm, 
+                        skip_confirm      = args.skip_confirm,
                         n_processes       = args.n_processes,
                         groups            = args.groups,
-                        aoi               = args.aoi
+                        aoi               = args.aoi,
+                        ee_project        = args.project
                     )
         except ValueError as e:
             print ("ERROR.", e)
@@ -163,15 +166,15 @@ def main():
 
     elif args.cmd == 'lp.compute':
         print ("computing proportions")
-        label_proportions_compute(tiles_file = args.tiles_file, 
-                                  labels_dataset_def = args.labels_dataset_def)      
+        label_proportions_compute(tiles_file = args.tiles_file,
+                                  labels_dataset_def = args.labels_dataset_def)
 
     elif args.cmd == 'lp.from_foreign':
         print ("computing proportions from foreign tiles")
         label_proportions_from_foreign(tiles_file         = args.tiles_file,
                                        foreign_tiles_file = args.foreign_tiles_file,
-                                       labels_dataset_def = args.labels_dataset_def)  
-        
+                                       labels_dataset_def = args.labels_dataset_def)
+
     elif args.cmd == 'aois':
         if args.showall:
             print ("showing predefined aois")
@@ -181,25 +184,25 @@ def main():
 
     elif args.cmd == 'split':
         print ("splitting bands")
-        split(tiles_file         = args.tiles_file, 
-              nbands             = args.nbands, 
+        split(tiles_file         = args.tiles_file,
+              nbands             = args.nbands,
               angle              = args.angle,
-              train_pct          = args.train_pct, 
-              test_pct           = args.test_pct, 
+              train_pct          = args.train_pct,
+              test_pct           = args.test_pct,
               val_pct            = args.val_pct,
               foreign_tiles_name = args.foreign_tiles_name)
-        
+
     elif args.cmd == 'zip.dataset':
         print ("zipping dataset")
-        zip_dataset(tiles_file          = args.tiles_file, 
+        zip_dataset(tiles_file          = args.tiles_file,
                     foreign_tiles_file  = args.foreign_tiles_file,
-                    images_dataset_def  = args.images_dataset_def, 
-                    labels_dataset_def  = args.labels_dataset_def, 
+                    images_dataset_def  = args.images_dataset_def,
+                    labels_dataset_def  = args.labels_dataset_def,
                     readme_file         = args.readme_file)
-        
+
     elif args.cmd == 'mosaic.fromvals':
         print ("making mosaic from tile values")
         make_mosaic_for_tilevalues(tiles_file       = args.tiles_file,
-                                   meters_per_pixel = args.meters_per_pixel, 
+                                   meters_per_pixel = args.meters_per_pixel,
                                    dest_file        = args.dest_file,
                                    dtype            = np.float32)
