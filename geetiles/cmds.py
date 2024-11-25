@@ -160,15 +160,15 @@ n_processes        {n_processes}
     else:
         ee.Authenticate(auth_mode = ee_auth_mode)
 
-    for i in range(10):
-        try:
-            ee.Initialize(project = ee_project)
-        except Exception as e:
-            if i==9:
-                raise e
-            print ("error initializing gee", e)
-            print ("waiting 2 secs to retry")
-            sleep(2)
+    # for i in range(10):
+    #     try:
+    #         ee.Initialize(project = ee_project)
+    #     except Exception as e:
+    #         if i==9:
+    #             raise e
+    #         print ("error initializing gee", e)
+    #         print ("waiting 2 secs to retry")
+    #         sleep(2)
 
     dataset_name = dataset_definition.get_dataset_name()
 
@@ -193,6 +193,7 @@ n_processes        {n_processes}
         f.write(dataset_def)
 
     p.download_gee_tiles(dataset_definition = dataset_definition,
+                         ee_project = ee_project,
                          meters_per_pixel = meters_per_pixel,
                          pixels_lonlat = pixels_lonlat,
                          dtype = dtype,
