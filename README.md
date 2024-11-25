@@ -64,7 +64,7 @@ If using `esaworldcover-2020` as `dataset_def`, which is an alias to [ESA WorldC
 
 ### Using your own code to define the GEE source image object.
 
-    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --dataset_def crops.py --pixels_lonlat [100,100] --skip_if_exists --skip_confirm --n_processes 20
+    geet download --tiles_file lux_partitions_aschips_14c55eb7d417f.geojson  --dataset_def crops.py --pixels_lonlat [100,100] --skip_if_exists --skip_confirm --n_processes 20 --project {EE_PROJECT_NAME}
 
 where `crops.py` contains a python `class DatasetDefinition` following the structure of the predefined ones under `defs`.  The files `crops.py` will be saved under the destination folder for reference. The destination folder is created alongside the `tiles_file`.
 
@@ -95,7 +95,7 @@ With respect to a dataset downloaded with segmentation labels.
 
 We can also add the label proportions of the coarser tile in which each chip is embedded. First, we need to download the labels for each coarser tile from GEE.
 
-    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --dataset_def esa-world-cover  --meters_per_pixel 20  --skip_if_exists
+    geet download --tiles_file lux_partitions_communes_1a471c686e053.geojson  --dataset_def esa-world-cover  --meters_per_pixel 20  --skip_if_exists --project {EE_PROJECT_NAME}
 
 then, compute the label proportions at this coarser tiles:
 
