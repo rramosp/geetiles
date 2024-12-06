@@ -28,27 +28,27 @@ from . import utils
 epsg4326 = utils.epsg4326
 
 
-def split(tiles_file, 
-          nbands, 
+def split(tiles_file,
+          nbands,
           angle,
-          train_pct, 
-          test_pct, 
+          train_pct,
+          test_pct,
           val_pct,
           foreign_tiles_name=None):
-    
+
     p = partitions.PartitionSet.from_file(tiles_file)
     if foreign_tiles_name is None:
-        p.split(nbands=nbands, angle=angle, 
+        p.split(nbands=nbands, angle=angle,
                         train_pct=train_pct, test_pct=test_pct, val_pct=val_pct)
     else:
-        p.split_per_partitions(nbands=nbands, angle=angle, 
-                            train_pct=train_pct, test_pct=test_pct, val_pct=val_pct, 
+        p.split_per_partitions(nbands=nbands, angle=angle,
+                            train_pct=train_pct, test_pct=test_pct, val_pct=val_pct,
                             other_partitions_id=foreign_tiles_name)
     p.save_splits()
 
-def label_proportions_compute(tiles_file, 
+def label_proportions_compute(tiles_file,
                               labels_dataset_def):
-    
+
     label_dataset_definition = utils.get_dataset_definition(labels_dataset_def)
     print ("loading tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
@@ -68,9 +68,9 @@ def label_proportions_from_foreign(tiles_file,
     print ("loading primary tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
     print ("loading foreign tiles from", foreign_tiles_file, flush=True)
-    t = partitions.PartitionSet.from_file(foreign_tiles_file) 
+    t = partitions.PartitionSet.from_file(foreign_tiles_file)
     print ("intersecting geometries and computing label proportions from foreign tiles", flush=True)
-    p.add_foreign_proportions(label_dataset_definition, t)    
+    p.add_foreign_proportions(label_dataset_definition, t)
     print ("done!")
 
 
@@ -78,24 +78,25 @@ def intersect_with_foreign(tiles_file, foreign_tiles_file):
     print ("loading primary tiles from", tiles_file, flush=True)
     p = partitions.PartitionSet.from_file(tiles_file)
     print ("loading foreign tiles from", foreign_tiles_file, flush=True)
-    t = partitions.PartitionSet.from_file(foreign_tiles_file) 
+    t = partitions.PartitionSet.from_file(foreign_tiles_file)
     print ("intersecting geometries with foreign tiles", flush=True)
-    p.add_foreign_partition(t)    
+    p.add_foreign_partition(t)
     print ("done!")
 
 
-def download(tiles_file, 
-             dataset_def, 
-             pixels_lonlat, meters_per_pixel, 
+def download(tiles_file,
+             dataset_def,
+             pixels_lonlat, meters_per_pixel,
              max_downloads,
              shuffle,
              skip_if_exists,
              ee_auth_mode,
              n_processes,
+             ee_project,
              groups = None,
              aoi = None,
              skip_confirm=False):
-    
+
     # sanity check
     if (pixels_lonlat is None and meters_per_pixel is None) or\
        (pixels_lonlat is not None and meters_per_pixel is not None):
@@ -115,7 +116,7 @@ def download(tiles_file,
 
     groups_str = f'groups             {groups}' if groups is not None else ''
     aoi_str    = f'aoi                {aoi}' if aoi is not None else ''
-    
+
     print (f"""
 using the following download specficication
 
@@ -132,42 +133,42 @@ n_processes        {n_processes}
 {groups_str}
 {aoi_str}
         """)
-    
+
     if not skip_confirm:
         while True:
-            yesno = input("confirm (y/N): ")        
+            yesno = input("confirm (y/N): ")
             yesno = yesno.lower()
             if yesno.strip()=='':
                 yesno = 'n'
             if yesno in ['y', 'n', 'yes', 'no']:
                 break
-        
+
         if yesno in ['n', 'no']:
             print ("abort!!")
             return
-        
+
     # authenticate on google earth engine
     print ("authenticating to Google Earth Engine")
     if ee_auth_mode is None:
         try:
             print ("trying to use default gee credentials")
-            ee.Authenticate(auth_mode = 'appdefault')    
+            ee.Authenticate(auth_mode = 'appdefault')
         except:
             print ("could not authenticate with default gee credentials, using auth_method = 'notebook'")
             ee.Authenticate(auth_mode = 'notebook')
-        
+
     else:
         ee.Authenticate(auth_mode = ee_auth_mode)
 
-    for i in range(10):
-        try:
-            ee.Initialize()
-        except Exception as e:
-            if i==9:
-                raise e
-            print ("error initializing gee", e)
-            print ("waiting 2 secs to retry")
-            sleep(2)
+    # for i in range(10):
+    #     try:
+    #         ee.Initialize(project = ee_project)
+    #     except Exception as e:
+    #         if i==9:
+    #             raise e
+    #         print ("error initializing gee", e)
+    #         print ("waiting 2 secs to retry")
+    #         sleep(2)
 
     dataset_name = dataset_definition.get_dataset_name()
 
@@ -191,15 +192,16 @@ n_processes        {n_processes}
     with open(f"{dest_dir}.dataset_def.py", "w") as f:
         f.write(dataset_def)
 
-    p.download_gee_tiles(dataset_definition = dataset_definition, 
-                         meters_per_pixel = meters_per_pixel, 
+    p.download_gee_tiles(dataset_definition = dataset_definition,
+                         ee_project = ee_project,
+                         meters_per_pixel = meters_per_pixel,
                          pixels_lonlat = pixels_lonlat,
-                         dtype = dtype, 
+                         dtype = dtype,
                          shuffle = shuffle,
                          skip_if_exists = skip_if_exists,
                          n_processes = n_processes,
                          max_downloads=max_downloads)
-    
+
     print("\ndone.")
 
 def make_random_partitions(aoi_wkt_file, max_rectangle_size_meters, aoi_name, dest_dir, random_variance=0.1, ):
@@ -207,13 +209,13 @@ def make_random_partitions(aoi_wkt_file, max_rectangle_size_meters, aoi_name, de
     makes random partitions of the aoi
     """
     with open(aoi_wkt_file, "r") as f:
-        aoi = wkt.loads(f.read()) 
-        
+        aoi = wkt.loads(f.read())
+
     parts = partitions.PartitionSet(aoi_name, region=aoi)
     parts.reset_data().make_random_partitions(max_rectangle_size=max_rectangle_size_meters, random_variance=random_variance)
     print()
     parts.save_as(dest_dir, f'{max_rectangle_size_meters//1000}k')
-    
+
     return parts.data
 
 def show_aois():
@@ -290,10 +292,10 @@ def extract_aoi(aoiname):
         print (f"aoi saved to '{fname}'")
 
 def make_grid(aoi_wkt_file, chip_size_meters, aoi_name, dest_dir):
-    
+
     with open(aoi_wkt_file, "r") as f:
-        aoi = wkt.loads(f.read()) 
-            
+        aoi = wkt.loads(f.read())
+
     grid = build_grid(aoi=aoi, chip_size_meters=chip_size_meters)
     parts = partitions.PartitionSet(aoi_name, data=grid)
     print()
@@ -303,7 +305,7 @@ def make_grid(aoi_wkt_file, chip_size_meters, aoi_name, dest_dir):
 def build_grid(aoi, chip_size_meters):
     """
     make a grid of squared tiles. The resulting tiles sides have
-    constant lat and lon, as required by GEE, otherwise unaligned geometries 
+    constant lat and lon, as required by GEE, otherwise unaligned geometries
     produce null pixels on the borders, when extracting the geometry from gee.
 
     aoi: a shapely object with the geometry to cover. must be in degrees (epsg4326)
@@ -312,7 +314,7 @@ def build_grid(aoi, chip_size_meters):
     returns: a GeoPandas dataframe in epsg4326
     """
     m = chip_size_meters
-    
+
     # make a grid of points using utm crs
     aoi_utm = utils.get_utm_crs(*list(aoi.centroid.coords)[0])
     aoim = gpd.GeoDataFrame({'geometry': [aoi]}, crs=epsg4326).to_crs(aoi_utm).geometry[0]
@@ -324,7 +326,7 @@ def build_grid(aoi, chip_size_meters):
     rangey = maxy-miny
     gridx = int(rangex//m)
     gridy = int(rangey//m)
-    
+
     def get_polygon(m, gx, gy, minx, miny):
 
         rlon, rlat = gx*m+minx, gy*m+miny
@@ -337,7 +339,7 @@ def build_grid(aoi, chip_size_meters):
 
         # obtain how many meters per degree lon and lat in this region of the globe.
         # by doing the aritmethic in degrees (not in meters) we ensure tile sides have
-        # constant lat and lon, as required by GEE, otherwise unaligned geometries 
+        # constant lat and lon, as required by GEE, otherwise unaligned geometries
         # produce null pixels on the borders.
         lon0,lat0 = list(gpd.GeoSeries([sh.geometry.Point([clon, clat])], crs=epsg4326).to_crs(aoi_utm).values[0].coords)[0]
         lon1,lat1 = list(gpd.GeoSeries([sh.geometry.Point([clon+0.001, clat])], crs=epsg4326).to_crs(aoi_utm).values[0].coords)[0]
@@ -348,14 +350,14 @@ def build_grid(aoi, chip_size_meters):
         delta_degrees_lon =  ((m-1)/2) / meters_per_degree_lon
         delta_degrees_lat =  ((m-1)/2) / meters_per_degree_lat
 
-        part =  sh.geometry.Polygon([[clon-delta_degrees_lon, clat-delta_degrees_lat], 
+        part =  sh.geometry.Polygon([[clon-delta_degrees_lon, clat-delta_degrees_lat],
                                      [clon-delta_degrees_lon, clat+delta_degrees_lat],
                                      [clon+delta_degrees_lon, clat+delta_degrees_lat],
                                      [clon+delta_degrees_lon, clat-delta_degrees_lat],
-                                     [clon-delta_degrees_lon, clat-delta_degrees_lat]])    
-        return part    
-    
-    
+                                     [clon-delta_degrees_lon, clat-delta_degrees_lat]])
+        return part
+
+
     # create a polygon at each point
     print (f"inspecting {gridx*gridy} chips", flush=True)
 
@@ -377,10 +379,10 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
     if not  parts.crs == epsg4326:
            raise ValueError("'orig_shapefile' must be in epsg4326, lon/lat degrees "+\
                             f"but found \n{parts.crs}")
-    
+
     with open(aoi_wkt_file, "r") as f:
-        aoi = wkt.loads(f.read()) 
-    
+        aoi = wkt.loads(f.read())
+
     print ("selecting geometries", flush=True)
     parts = [p for p in pbar(parts.geometry) if p.intersects(aoi)]
     if len(parts)==0:
@@ -388,7 +390,7 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
     # very small intersections probably are cause by numerical approximations
     # on the borders of the aoi
     parts = [p for p in parts if p.intersection(aoi).area>1e-5]
-    
+
     parts = gpd.GeoDataFrame({'geometry': parts}, crs = CRS.from_epsg(4326))
     parts.to_file("/tmp/bb.geojson", driver='GeoJSON')
     parts = partitions.PartitionSet(aoi_name, data=parts)
@@ -397,12 +399,12 @@ def select_partitions(orig_shapefile, aoi_wkt_file, aoi_name, tiles_name, dest_d
 
     return parts
 
-def zip_dataset(tiles_file, 
+def zip_dataset(tiles_file,
                 foreign_tiles_file,
-                images_dataset_def, 
-                labels_dataset_def, 
+                images_dataset_def,
+                labels_dataset_def,
                 readme_file):
-    
+
 
     images_dataset = utils.get_dataset_definition(images_dataset_def)
     images_dataset_name = images_dataset.get_dataset_name()
@@ -431,7 +433,7 @@ def zip_dataset(tiles_file,
         foreign_tiles_name = s[s.find('_partitions_')+len('_partitions_'):].split("_")[0]
     else:
         foreign_tiles_name = None
-        
+
     print ("preparing folders")
     os.makedirs(f"{destination_dir}/data", exist_ok=True)
 
@@ -442,9 +444,9 @@ def zip_dataset(tiles_file,
         elif filebase.endswith('_expanded'):
             r = "_".join(filebase.split("_")[:-2])+"_expanded"+extension
         else:
-            r = "_".join(filebase.split("_")[:-1])+extension            
+            r = "_".join(filebase.split("_")[:-1])+extension
         return r
-    
+
     print ("creating expanded file for easy visualization of label proportions")
     p = partitions.PartitionSet.from_file(tiles_file)
     p.expand_proportions()
@@ -475,7 +477,7 @@ def zip_dataset(tiles_file,
     print ("reading tiles file")
     # read chip definitions
     c = gpd.read_file(tiles_file)
-    # gather imgs, labels and proportions 
+    # gather imgs, labels and proportions
     partitionset_dir = os.path.splitext(f"{basedir}/{tiles_file}")[0]
     n_skipped_chips = 0
     n_included_chips = 0
@@ -492,19 +494,19 @@ def zip_dataset(tiles_file,
             img = imread(img_filename).astype(np.int16)
             if 'map_values' in dir(images_dataset):
                 img = images_dataset.map_values(img)
-            
+
             coords = np.r_[i.geometry.envelope.boundary.coords]
             center_latlon = coords.mean(axis=0)[::-1]
             cmax = coords.max(axis=0)[::-1]
             cmin = coords.min(axis=0)[::-1]
             nw = np.r_[cmax[0], cmin[1]]
-            se = np.r_[cmin[0], cmax[1]]    
+            se = np.r_[cmin[0], cmax[1]]
 
             r['chip'] = img
             r['chip_id'] = i.identifier
             r['center_latlon'] = center_latlon
             r['corners'] = { 'nw': nw, 'se': se }
-            
+
             if labels_dataset_name is not None and os.path.exists(label_filename):
                 label = imread(label_filename).astype(np.int16)
                 if 'map_values' in dir(labels_dataset):
@@ -579,14 +581,14 @@ def get_bounds(raster_file):
     src.close()
     return np.r_[[w,s,e,n]]
 
-    
+
 def get_resized_img_with_pixel_coords(raster_file, utm_crs, min_lonlat_meters, meters_per_pixel):
     """
-    reads an image 
+    reads an image
     """
-    
+
     epsg4326 = CRS.from_epsg(4326)
-    
+
     # read image
 
     try:
@@ -594,17 +596,17 @@ def get_resized_img_with_pixel_coords(raster_file, utm_crs, min_lonlat_meters, m
             w,s,e,n = src.bounds
             img = src.read()
             img = np.transpose(img, [2,1,0])
-            
-        # transform dimensions into pixel coords    
+
+        # transform dimensions into pixel coords
         coords = np.r_[list(gpd.GeoDataFrame([], geometry=[sh.geometry.Polygon([[w,n], [w,s], [e,s], [e,n]])], crs=epsg4326).to_crs(utm_crs).geometry.values[0].boundary.coords)]
         sw_corner_lonlat_meters = coords[1]
 
         coords_pixels = np.ceil((coords - min_lonlat_meters) / meters_per_pixel).astype(int)
-        sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int) 
+        sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int)
 
         patch_size = coords_pixels[2,0] - coords_pixels[1,0], coords_pixels[3,1] - coords_pixels[2,1]
 
-        # resize and rotate img 
+        # resize and rotate img
         rotate_x = coords_pixels[0,0] - coords_pixels[1,0]
         rotate_y = coords_pixels[1,1] - coords_pixels[2,1]
         rotate_x = patch_size[1]
@@ -621,11 +623,11 @@ def get_resized_img_with_pixel_coords(raster_file, utm_crs, min_lonlat_meters, m
     except:
         x0,x1,y0,y1,img_resized = [None]*5
 
-    return x0,x1, y0,y1, img_resized    
+    return x0,x1, y0,y1, img_resized
 
-def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):    
+def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):
     """
-    creates a mosaic of all tifs found in a folder. assumes all tiffs use the same numeric 
+    creates a mosaic of all tifs found in a folder. assumes all tiffs use the same numeric
     type and all pixels are non-zero (i.e, from rectangular grid)
 
     basedir:           the folder to look for tiffs (not recursively)
@@ -640,35 +642,35 @@ def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):
     epsg4326 = CRS.from_epsg(4326)
 
     fnames = sorted(os.listdir(basedir))
-    
-    print (f"computing resulting mosaic image size for {len(fnames)} files", flush=True) 
+
+    print (f"computing resulting mosaic image size for {len(fnames)} files", flush=True)
     bounds = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_bounds)(f"{basedir}/{fname}") for fname in fnames)
     bounds = np.r_[bounds]
 
     # compute meters utm corresponding to the mean location of all geometries
     coords      = np.vstack([bounds[:, :2], bounds[:,2:]])
-    
+
     mean_lonlat = coords.mean(axis=0)
     utm_crs     = utils.get_utm_crs(*mean_lonlat)
     min_lonlat  = coords.min(axis=0)
     max_lonlat  = coords.max(axis=0)
-    
+
     # compute bounding rectangle bounds in meters
-    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
-                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([],
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)],
                                                             crs=epsg4326)\
                                               .to_crs(utm_crs).geometry.values
 
     min_lonlat_meters, max_lonlat_meters = np.r_[min_lonlat_meters.coords][0], np.r_[max_lonlat_meters.coords][0]
-    
+
     # compute dimensions of resulting image
     img_dim_x, img_dim_y = np.round((max_lonlat_meters - min_lonlat_meters)  / meters_per_pixel).astype(int)
-    
+
     # get type of resulting tiff by opening any file
     src = rasterio.open(f"{basedir}/{fnames[0]}")
     r = np.zeros([img_dim_x, img_dim_y, len(channels)], dtype=src.dtypes[0])
     src.close()
-    
+
     print ("\nreading and resizing images", flush=True)
     imgs_and_coords = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_resized_img_with_pixel_coords)(f"{basedir}/{fname}", utm_crs, min_lonlat_meters, meters_per_pixel) for fname in fnames)
 
@@ -684,9 +686,9 @@ def make_mosaic(basedir, meters_per_pixel, dest_file, channels=None):
     # transpose x and y, and flip
     r = np.transpose(r, [1,0,2])
     r = r[::-1, :, :]
-        
+
     left, top = min_lonlat_meters[0], max_lonlat_meters[1]
-    resx, resy = (max_lonlat_meters - min_lonlat_meters) / np.r_[r.shape[:2]] 
+    resx, resy = (max_lonlat_meters - min_lonlat_meters) / np.r_[r.shape[:2]]
     transform = from_origin(left, top, meters_per_pixel, meters_per_pixel)
     with rasterio.open(dest_file, 'w', driver='GTiff',
                     height = r.shape[0], width = r.shape[1],
@@ -743,14 +745,14 @@ def cleanup(basedir):
 
 def get_pixels_with_coords(bounds, fill_value, utm_crs, min_lonlat_meters, meters_per_pixel, dtype):
     """
-    bounds: a tuple with (w,s,e,n) 
-    
+    bounds: a tuple with (w,s,e,n)
+
     """
     epsg4326 = CRS.from_epsg(4326)
     w,s,e,n  = bounds
 
     coords = np.r_[list(gpd.GeoDataFrame([], geometry=[sh.geometry.Polygon([[w,n], [w,s], [e,s], [e,n]])], crs=epsg4326).to_crs(utm_crs).geometry.values[0].boundary.coords)]
-    sw_corner_lonlat_meters = coords[1] 
+    sw_corner_lonlat_meters = coords[1]
 
     coords_pixels = np.ceil((coords - min_lonlat_meters) / meters_per_pixel).astype(int)
 
@@ -760,11 +762,11 @@ def get_pixels_with_coords(bounds, fill_value, utm_crs, min_lonlat_meters, meter
     coords_pixels[2] += np.r_[[+w,-w]]
     coords_pixels[3] += np.r_[[+w,+w]]
 
-    sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int) 
+    sw_lonlat_pixels = np.ceil((sw_corner_lonlat_meters - min_lonlat_meters) / meters_per_pixel).astype(int)
 
     patch_size = coords_pixels[2,0] - coords_pixels[1,0], coords_pixels[3,1] - coords_pixels[2,1]
 
-    # resize and rotate img 
+    # resize and rotate img
     rotate_x = coords_pixels[0,0] - coords_pixels[1,0]
     rotate_y = coords_pixels[1,1] - coords_pixels[2,1]
     rotate_x = patch_size[1]
@@ -774,16 +776,16 @@ def get_pixels_with_coords(bounds, fill_value, utm_crs, min_lonlat_meters, meter
     rotated_patch_size = img_resized.shape[:2]
 
     x0, x1 = sw_lonlat_pixels[0], sw_lonlat_pixels[0] + rotated_patch_size[0]
-    y0, y1 = sw_lonlat_pixels[1] - rotate_y, sw_lonlat_pixels[1] + rotated_patch_size[1] - rotate_y 
+    y0, y1 = sw_lonlat_pixels[1] - rotate_y, sw_lonlat_pixels[1] + rotated_patch_size[1] - rotate_y
 
-    return x0,x1, y0,y1, img_resized    
+    return x0,x1, y0,y1, img_resized
 
 
 def make_mosaic_for_tilevalues(tiles_file, meters_per_pixel, dest_file, dtype=np.float32):
 
     print (f"reading tiles file from {tiles_file}")
     zc = gpd.read_file(tiles_file)
-    
+
     epsg4326 = CRS.from_epsg(4326)
 
     # compute bounding coordinates
@@ -796,8 +798,8 @@ def make_mosaic_for_tilevalues(tiles_file, meters_per_pixel, dest_file, dtype=np
     max_lonlat  = coords.max(axis=0)
 
     # compute bounding rectangle bounds in meters
-    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
-                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([],
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)],
                                                             crs=epsg4326)\
                                               .to_crs(utm_crs).geometry.values
 
@@ -806,10 +808,10 @@ def make_mosaic_for_tilevalues(tiles_file, meters_per_pixel, dest_file, dtype=np
     # compute dimensions of resulting image
     img_dim_x, img_dim_y = np.round((max_lonlat_meters - min_lonlat_meters)  / meters_per_pixel).astype(int)
 
-    
+
     # compute bounding rectangle bounds in meters
-    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
-                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([],
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)],
                                                             crs=epsg4326)\
                                               .to_crs(utm_crs).geometry.values
 
@@ -823,8 +825,8 @@ def make_mosaic_for_tilevalues(tiles_file, meters_per_pixel, dest_file, dtype=np
     imgs_and_coords = utils.mParallel(n_jobs=-1, verbose=30)(delayed(get_pixels_with_coords)(t.geometry.bounds, t.value, utm_crs, min_lonlat_meters, meters_per_pixel, dtype) for _,t in zc.iterrows())
 
     # compute bounding rectangle bounds in meters
-    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([], 
-                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)], 
+    min_lonlat_meters, max_lonlat_meters = gpd.GeoDataFrame([],
+                                                            geometry=[sh.geometry.Point(min_lonlat), sh.geometry.Point(max_lonlat)],
                                                             crs=epsg4326)\
                                               .to_crs(utm_crs).geometry.values
 
@@ -847,9 +849,9 @@ def make_mosaic_for_tilevalues(tiles_file, meters_per_pixel, dest_file, dtype=np
     # transpose x and y, and flip
     r = np.transpose(r, [1,0,2])
     r = r[::-1, :, :]
-    
+
     left, top = min_lonlat_meters[0], max_lonlat_meters[1]
-    resx, resy = (max_lonlat_meters - min_lonlat_meters) / np.r_[r.shape[:2]] 
+    resx, resy = (max_lonlat_meters - min_lonlat_meters) / np.r_[r.shape[:2]]
     transform = from_origin(left, top, meters_per_pixel, meters_per_pixel)
     with rasterio.open(dest_file, 'w', driver='GTiff',
                     height = r.shape[0], width = r.shape[1],
